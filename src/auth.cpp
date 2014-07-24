@@ -84,7 +84,7 @@ void Auth::signIn(int accountId)
 
     // determine the remote server URL from the account settings, and then sign in.
     m_account->selectService(srv);
-    m_serverUrl = m_account->value("CardDAVServerUrl").toString(); // TODO: use "Remote database" for consistency?
+    m_serverUrl = m_account->value("server_address").toString();
     if (m_serverUrl.isEmpty()) {
         qWarning() << Q_FUNC_INFO << "no valid server url setting in account" << accountId;
         emit signInError();
