@@ -22,7 +22,7 @@
 
 #include "auth_p.h"
 #include <sailfishkeyprovider.h>
-#include <QtDebug>
+#include <LogMacros.h>
 
 namespace {
     QString skp_storedKey(const QString &provider, const QString &service, const QString &key)
@@ -61,7 +61,7 @@ void Auth::signIn(int accountId)
 {
     m_account = m_manager.account(accountId);
     if (!m_account) {
-        qWarning() << Q_FUNC_INFO << "unable to load account" << accountId;
+        LOG_WARNING(Q_FUNC_INFO << "unable to load account" << accountId);
         emit signInError();
         return;
     }
@@ -77,7 +77,7 @@ void Auth::signIn(int accountId)
     }
 
     if (!srv.isValid()) {
-        qWarning() << Q_FUNC_INFO << "unable to find carddav service for account" << accountId;
+        LOG_WARNING(Q_FUNC_INFO << "unable to find carddav service for account" << accountId);
         emit signInError();
         return;
     }
@@ -86,14 +86,14 @@ void Auth::signIn(int accountId)
     m_account->selectService(srv);
     m_serverUrl = m_account->value("server_address").toString();
     if (m_serverUrl.isEmpty()) {
-        qWarning() << Q_FUNC_INFO << "no valid server url setting in account" << accountId;
+        LOG_WARNING(Q_FUNC_INFO << "no valid server url setting in account" << accountId);
         emit signInError();
         return;
     }
 
     m_ident = m_account->credentialsId() > 0 ? SignOn::Identity::existingIdentity(m_account->credentialsId()) : 0;
     if (!m_ident) {
-        qWarning() << Q_FUNC_INFO << "no valid credentials for account" << accountId;
+        LOG_WARNING(Q_FUNC_INFO << "no valid credentials for account" << accountId);
         emit signInError();
         return;
     }
@@ -103,7 +103,7 @@ void Auth::signIn(int accountId)
     QString mechanism = accSrv.authData().mechanism();
     SignOn::AuthSession *session = m_ident->createSession(method);
     if (!session) {
-        qWarning() << Q_FUNC_INFO << "unable to create authentication session with account" << accountId;
+        LOG_WARNING(Q_FUNC_INFO << "unable to create authentication session with account" << accountId);
         emit signInError();
         return;
     }
@@ -155,14 +155,14 @@ void Auth::signOnResponse(const SignOn::SessionData &response)
     } else if (!username.isEmpty() && !password.isEmpty()) {
         emit signInCompleted(m_serverUrl, username, password, QString());
     } else {
-        qWarning() << Q_FUNC_INFO << "authentication succeeded, but couldn't find valid credentials";
+        LOG_WARNING(Q_FUNC_INFO << "authentication succeeded, but couldn't find valid credentials");
         emit signInError();
     }
 }
 
 void Auth::signOnError(const SignOn::Error &error)
 {
-    qWarning() << Q_FUNC_INFO << "authentication error:" << error.type() << ":" << error.message();
+    LOG_WARNING(Q_FUNC_INFO << "authentication error:" << error.type() << ":" << error.message());
     emit signInError();
     return;
 }

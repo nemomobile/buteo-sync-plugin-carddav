@@ -24,13 +24,13 @@
 #include "syncer_p.h"
 #include "carddav_p.h"
 
+#include <LogMacros.h>
+
 #include <QString>
 #include <QList>
 #include <QXmlStreamReader>
 #include <QByteArray>
 #include <QRegularExpression>
-
-#include <QtDebug>
 
 #include <QContactGuid>
 
@@ -139,7 +139,7 @@ QString ReplyParser::parseUserPrinciple(const QByteArray &userInformationRespons
     }
 
     if (!statusText.contains(QLatin1String("200 OK"))) {
-        qWarning() << Q_FUNC_INFO << "invalid status response to current user information request:" << statusText;
+        LOG_WARNING(Q_FUNC_INFO << "invalid status response to current user information request:" << statusText);
     }
 
     return userPrinciple;
@@ -183,7 +183,7 @@ QString ReplyParser::parseAddressbookHome(const QByteArray &addressbookUrlsRespo
     }
 
     if (!statusText.contains(QLatin1String("200 OK"))) {
-        qWarning() << Q_FUNC_INFO << "invalid status response to addressbook home request:" << statusText;
+        LOG_WARNING(Q_FUNC_INFO << "invalid status response to addressbook home request:" << statusText);
     }
 
     return addressbookHome;
@@ -230,19 +230,19 @@ QList<ReplyParser::AddressBookInformation> ReplyParser::parseAddressbookInformat
         currInfo.displayName = rmap.value("propstat").toMap().value("prop").toMap().value("displayname").toMap().value("@text").toString();
         QStringList resourceTypeKeys = rmap.value("propstat").toMap().value("prop").toMap().value("resourcetype").toMap().keys();
         if (!resourceTypeKeys.contains(QStringLiteral("addressbook"), Qt::CaseInsensitive)) {
-            qDebug() << Q_FUNC_INFO << "ignoring non-addressbook response";
+            LOG_DEBUG(Q_FUNC_INFO << "ignoring non-addressbook response");
             continue;
         }
         QString status = rmap.value("propstat").toMap().value("status").toMap().value("@text").toString();
         if (status.contains(QRegularExpression("2[0-9][0-9]"))) { // any HTTP 2xx response
             if (currInfo.ctag.isEmpty() && currInfo.syncToken.isEmpty()) {
-                qDebug() << Q_FUNC_INFO << "ignoring addressbook:" << currInfo.url << "due to lack of ctag";
+                LOG_DEBUG(Q_FUNC_INFO << "ignoring addressbook:" << currInfo.url << "due to lack of ctag");
             } else {
-                qDebug() << Q_FUNC_INFO << "found valid addressbook:" << currInfo.url;
+                LOG_DEBUG(Q_FUNC_INFO << "found valid addressbook:" << currInfo.url);
                 infos.append(currInfo);
             }
         } else {
-            qDebug() << Q_FUNC_INFO << "ignoring addressbook:" << currInfo.url << "due to invalid status:" << status;
+            LOG_DEBUG(Q_FUNC_INFO << "ignoring addressbook:" << currInfo.url << "due to invalid status:" << status);
         }
     }
 
@@ -316,7 +316,7 @@ QList<ReplyParser::ContactInformation> ReplyParser::parseSyncTokenDelta(const QB
         } else if (status.contains(QLatin1String("404 Not Found"))) {
             currInfo.modType = ReplyParser::ContactInformation::Deletion;
         } else {
-            qWarning() << Q_FUNC_INFO << "unknown response:" << currInfo.uri << currInfo.etag << status;
+            LOG_WARNING(Q_FUNC_INFO << "unknown response:" << currInfo.uri << currInfo.etag << status);
         }
         info.append(currInfo);
     }
@@ -391,7 +391,7 @@ QList<ReplyParser::ContactInformation> ReplyParser::parseContactMetadata(const Q
                 info.append(currInfo);
             }
         } else {
-            qWarning() << Q_FUNC_INFO << "unknown response:" << currInfo.uri << currInfo.etag << status;
+            LOG_WARNING(Q_FUNC_INFO << "unknown response:" << currInfo.uri << currInfo.etag << status);
         }
     }
 
@@ -484,8 +484,7 @@ QMap<QString, ReplyParser::FullContactInformation> ReplyParser::parseContactData
         QContactGuid guid = importedContact.detail<QContactGuid>();
         QString uid = guid.guid(); // at this stage it's a UID.
         if (uid.isEmpty()) {
-            qWarning() << Q_FUNC_INFO
-                       << "contact import from vcard has no UID:\n" << vcard;
+            LOG_WARNING(Q_FUNC_INFO << "contact import from vcard has no UID:\n" << vcard);
             continue;
         }
         bool found = false;

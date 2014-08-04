@@ -23,13 +23,13 @@
 #include "carddav_p.h"
 #include "syncer_p.h"
 
+#include <LogMacros.h>
+
 #include <QRegularExpression>
 #include <QUuid>
 #include <QByteArray>
 #include <QBuffer>
 #include <QTimer>
-
-#include <QtDebug>
 
 #include <QContact>
 #include <QContactGuid>
@@ -48,7 +48,7 @@ namespace {
         Q_FOREACH (const QChar &c, data) {
             if (c == '\r' || c == '\n') {
                 if (!dbgout.isEmpty()) {
-                    qWarning() << dbgout;
+                    LOG_DEBUG(dbgout);
                     dbgout.clear();
                 }
             } else {
@@ -56,7 +56,7 @@ namespace {
             }
         }
         if (!dbgout.isEmpty()) {
-            qWarning() << dbgout;
+            LOG_DEBUG(dbgout);
         }
     }
 }
@@ -92,9 +92,9 @@ QPair<QContact, QStringList> CardDavVCardConverter::convertVCardToContact(const 
     reader.waitForFinished();
     QList<QVersitDocument> vdocs = reader.results();
     if (vdocs.size() != 1) {
-        qWarning() << Q_FUNC_INFO
+        LOG_WARNING(Q_FUNC_INFO
                    << "invalid results during vcard import, got"
-                   << vdocs.size() << "output from input:\n" << vcard;
+                   << vdocs.size() << "output from input:\n" << vcard);
         *ok = false;
         return QPair<QContact, QStringList>();
     }
@@ -105,9 +105,9 @@ QPair<QContact, QStringList> CardDavVCardConverter::convertVCardToContact(const 
     importer.importDocuments(vdocs);
     QList<QContact> importedContacts = importer.contacts();
     if (importedContacts.size() != 1) {
-        qWarning() << Q_FUNC_INFO
+        LOG_WARNING(Q_FUNC_INFO
                    << "invalid results during vcard conversion, got"
-                   << importedContacts.size() << "output from input:\n" << vcard;
+                   << importedContacts.size() << "output from input:\n" << vcard);
         *ok = false;
         return QPair<QContact, QStringList>();
     }
@@ -144,7 +144,7 @@ QString CardDavVCardConverter::convertContactToVCard(const QContact &c, const QS
     }
 
 /*
-    qDebug() << "generated vcard:";
+    LOG_DEBUG("generated vcard:");
     debugDumpData(retn);
 */
 
@@ -171,7 +171,7 @@ QString CardDavVCardConverter::convertPropertyToString(const QVersitProperty &p)
         return retn;
     }
 
-    qWarning() << Q_FUNC_INFO << "no string conversion possible for versit property:" << p.name();
+    LOG_WARNING(Q_FUNC_INFO << "no string conversion possible for versit property:" << p.name());
     return QString();
 }
 
@@ -200,7 +200,7 @@ void CardDavVCardConverter::documentProcessed(const QVersitDocument &, QContact 
     // the UID of the contact will be contained in the QContactGuid detail.
     QString uid = c->detail<QContactGuid>().guid();
     if (uid.isEmpty()) {
-        qWarning() << Q_FUNC_INFO << "imported contact has no UID, discarding unsupported properties!";
+        LOG_WARNING(Q_FUNC_INFO << "imported contact has no UID, discarding unsupported properties!");
     } else {
         m_unsupportedProperties.insert(uid, m_tempUnsupportedProperties);
     }
@@ -285,7 +285,7 @@ void CardDav::determineRemoteAMR()
 
 void CardDav::fetchUserInformation()
 {
-    qDebug() << Q_FUNC_INFO << "requesting principle urls for user";
+    LOG_DEBUG(Q_FUNC_INFO << "requesting principle urls for user");
     QNetworkReply *reply = m_request->currentUserInformation(m_serverUrl);
     if (!reply) {
         emit error();
@@ -300,8 +300,8 @@ void CardDav::userInformationResponse()
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
-        qWarning() << Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")";
+        LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
+                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
         debugDumpData(QString::fromUtf8(data));
         errorOccurred();
         return;
@@ -309,7 +309,7 @@ void CardDav::userInformationResponse()
 
     QString userPath = m_parser->parseUserPrinciple(data);
     if (userPath.isEmpty()) {
-        qWarning() << Q_FUNC_INFO << "unable to parse user principle from response";
+        LOG_WARNING(Q_FUNC_INFO << "unable to parse user principle from response");
         emit error();
         return;
     }
@@ -319,7 +319,7 @@ void CardDav::userInformationResponse()
 
 void CardDav::fetchAddressbookUrls(const QString &userPath)
 {
-    qDebug() << Q_FUNC_INFO << "requesting addressbook urls for user";
+    LOG_DEBUG(Q_FUNC_INFO << "requesting addressbook urls for user");
     QNetworkReply *reply = m_request->addressbookUrls(m_serverUrl, userPath);
     if (!reply) {
         emit error();
@@ -334,8 +334,8 @@ void CardDav::addressbookUrlsResponse()
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
-        qWarning() << Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")";
+        LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
+                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
         debugDumpData(QString::fromUtf8(data));
         errorOccurred();
         return;
@@ -343,7 +343,7 @@ void CardDav::addressbookUrlsResponse()
 
     QString addressbooksHomePath = m_parser->parseAddressbookHome(data);
     if (addressbooksHomePath.isEmpty()) {
-        qWarning() << Q_FUNC_INFO << "unable to parse addressbook home from response";
+        LOG_WARNING(Q_FUNC_INFO << "unable to parse addressbook home from response");
         emit error();
         return;
     }
@@ -353,7 +353,7 @@ void CardDav::addressbookUrlsResponse()
 
 void CardDav::fetchAddressbooksInformation(const QString &addressbooksHomePath)
 {
-    qDebug() << Q_FUNC_INFO << "requesting addressbook sync information";
+    LOG_DEBUG(Q_FUNC_INFO << "requesting addressbook sync information");
     QNetworkReply *reply = m_request->addressbooksInformation(m_serverUrl, addressbooksHomePath);
     if (!reply) {
         emit error();
@@ -368,8 +368,8 @@ void CardDav::addressbooksInformationResponse()
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
-        qWarning() << Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")";
+        LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
+                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
         debugDumpData(QString::fromUtf8(data));
         errorOccurred();
         return;
@@ -377,7 +377,7 @@ void CardDav::addressbooksInformationResponse()
 
     QList<ReplyParser::AddressBookInformation> infos = m_parser->parseAddressbookInformation(data);
     if (infos.isEmpty()) {
-        qWarning() << Q_FUNC_INFO << "unable to parse addressbook info from response";
+        LOG_WARNING(Q_FUNC_INFO << "unable to parse addressbook info from response");
         emit error();
         return;
     }
@@ -405,8 +405,8 @@ void CardDav::addressbooksInformationResponse()
                 fetchContactMetadata(infos[i].url);
             } else {
                 // no changes have occurred in this addressbook since last sync
-                qDebug() << Q_FUNC_INFO << "no changes since last sync for"
-                         << infos[i].url << "from account" << q->m_accountId;
+                LOG_DEBUG(Q_FUNC_INFO << "no changes since last sync for"
+                         << infos[i].url << "from account" << q->m_accountId);
                 m_downsyncRequests += 1;
                 QTimer::singleShot(0, this, SLOT(downsyncComplete()));
             }
@@ -431,8 +431,8 @@ void CardDav::addressbooksInformationResponse()
                 fetchImmediateDelta(infos[i].url, existingSyncToken);
             } else {
                 // no changes have occurred in this addressbook since last sync
-                qDebug() << Q_FUNC_INFO << "no changes since last sync for"
-                         << infos[i].url << "from account" << q->m_accountId;
+                LOG_DEBUG(Q_FUNC_INFO << "no changes since last sync for"
+                         << infos[i].url << "from account" << q->m_accountId);
                 m_downsyncRequests += 1;
                 QTimer::singleShot(0, this, SLOT(downsyncComplete()));
             }
@@ -442,9 +442,9 @@ void CardDav::addressbooksInformationResponse()
 
 void CardDav::fetchImmediateDelta(const QString &addressbookUrl, const QString &syncToken)
 {
-    qDebug() << Q_FUNC_INFO
+    LOG_DEBUG(Q_FUNC_INFO
              << "requesting immediate delta for addressbook" << addressbookUrl
-             << "with sync token" << syncToken;
+             << "with sync token" << syncToken);
 
     QNetworkReply *reply = m_request->syncTokenDelta(m_serverUrl, addressbookUrl, syncToken);
     if (!reply) {
@@ -463,8 +463,8 @@ void CardDav::immediateDeltaResponse()
     QString addressbookUrl = reply->property("addressbookUrl").toString();
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
-        qWarning() << Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")";
+        LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
+                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
         debugDumpData(QString::fromUtf8(data));
         // The server is allowed to forget the syncToken by the
         // carddav protocol.  Try a full report sync just in case.
@@ -480,7 +480,7 @@ void CardDav::immediateDeltaResponse()
 
 void CardDav::fetchContactMetadata(const QString &addressbookUrl)
 {
-    qDebug() << Q_FUNC_INFO << "requesting contact metadata for addressbook" << addressbookUrl;
+    LOG_DEBUG(Q_FUNC_INFO << "requesting contact metadata for addressbook" << addressbookUrl);
     QNetworkReply *reply = m_request->contactEtags(m_serverUrl, addressbookUrl);
     if (!reply) {
         emit error();
@@ -498,8 +498,8 @@ void CardDav::contactMetadataResponse()
     QString addressbookUrl = reply->property("addressbookUrl").toString();
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
-        qWarning() << Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")";
+        LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
+                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
         debugDumpData(QString::fromUtf8(data));
         errorOccurred();
         return;
@@ -511,7 +511,7 @@ void CardDav::contactMetadataResponse()
 
 void CardDav::fetchContacts(const QString &addressbookUrl, const QList<ReplyParser::ContactInformation> &amrInfo)
 {
-    qDebug() << Q_FUNC_INFO << "requesting full contact information from addressbook" << addressbookUrl;
+    LOG_DEBUG(Q_FUNC_INFO << "requesting full contact information from addressbook" << addressbookUrl);
 
     // split into A/M/R request sets
     QStringList contactUris;
@@ -527,23 +527,23 @@ void CardDav::fetchContacts(const QString &addressbookUrl, const QList<ReplyPars
         } else if (info.modType == ReplyParser::ContactInformation::Deletion) {
             q->m_serverDeletions[addressbookUrl].append(info);
         } else {
-            qWarning() << Q_FUNC_INFO << "no modification type in info for:" << info.uri;
+            LOG_WARNING(Q_FUNC_INFO << "no modification type in info for:" << info.uri);
         }
     }
 
-    qDebug() << Q_FUNC_INFO << "Have calculated AMR:"
+    LOG_DEBUG(Q_FUNC_INFO << "Have calculated AMR:"
              << q->m_serverAdditions[addressbookUrl].size()
              << q->m_serverModifications[addressbookUrl].size()
              << q->m_serverDeletions[addressbookUrl].size()
-             << "for addressbook:" << addressbookUrl;
+             << "for addressbook:" << addressbookUrl);
 
     if (contactUris.isEmpty()) {
         // no additions or modifications to fetch.
-        qDebug() << Q_FUNC_INFO << "no further data to fetch";
+        LOG_DEBUG(Q_FUNC_INFO << "no further data to fetch");
         contactAddModsComplete(addressbookUrl);
     } else {
         // fetch the full contact data for additions/modifications.
-        qDebug() << Q_FUNC_INFO << "fetching vcard data for" << contactUris.size() << "contacts";
+        LOG_DEBUG(Q_FUNC_INFO << "fetching vcard data for" << contactUris.size() << "contacts");
         QNetworkReply *reply = m_request->contactMultiget(m_serverUrl, addressbookUrl, contactUris);
         if (!reply) {
             emit error();
@@ -561,8 +561,8 @@ void CardDav::contactsResponse()
     QString addressbookUrl = reply->property("addressbookUrl").toString();
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
-        qWarning() << Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")";
+        LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
+                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
         debugDumpData(QString::fromUtf8(data));
         errorOccurred();
         return;
@@ -591,13 +591,13 @@ void CardDav::contactsResponse()
             q->m_contactUnsupportedProperties[guid] = it.value().unsupportedProperties;
             q->m_contactEtags[guid] = it.value().etag;
             if (!q->m_contactIds.contains(guid)) {
-                qWarning() << Q_FUNC_INFO << "modified contact has no id";
+                LOG_WARNING(Q_FUNC_INFO << "modified contact has no id");
             } else {
                 c.setId(QContactId::fromString(q->m_contactIds[guid]));
             }
             modified.append(c);
         } else {
-            qWarning() << Q_FUNC_INFO << "ignoring unknown addition/modification:" << it.key();
+            LOG_WARNING(Q_FUNC_INFO << "ignoring unknown addition/modification:" << it.key());
         }
     }
 
@@ -623,7 +623,7 @@ void CardDav::contactAddModsComplete(const QString &addressbookUrl)
         cguid.setGuid(guid);
         doomed.saveDetail(&cguid);
         if (!q->m_contactIds.contains(guid)) {
-            qWarning() << Q_FUNC_INFO << "removed contact has no id";
+            LOG_WARNING(Q_FUNC_INFO << "removed contact has no id");
             continue; // cannot remove it if we don't know the id
         }
         doomed.setId(QContactId::fromString(q->m_contactIds[guid]));
@@ -654,20 +654,20 @@ void CardDav::downsyncComplete()
     // if this was the last outstanding addressbook, we're finished.
     m_downsyncRequests -= 1;
     if (m_downsyncRequests == 0) {
-        qDebug() << Q_FUNC_INFO
+        LOG_DEBUG(Q_FUNC_INFO
                  << "downsync complete with total AMR:"
                  << m_remoteAdditions.size() << ","
                  << m_remoteModifications.size() << ","
-                 << m_remoteRemovals.size();
+                 << m_remoteRemovals.size());
         emit remoteChanges(m_remoteAdditions, m_remoteModifications, m_remoteRemovals);
     }
 }
 
 void CardDav::upsyncUpdates(const QString &addressbookUrl, const QList<QContact> &added, const QList<QContact> &modified, const QList<QContact> &removed)
 {
-    qDebug() << Q_FUNC_INFO
+    LOG_DEBUG(Q_FUNC_INFO
              << "upsyncing updates to addressbook:" << addressbookUrl
-             << ":" << added.count() << modified.count() << removed.count();
+             << ":" << added.count() << modified.count() << removed.count());
 
     if (added.size() == 0 && modified.size() == 0 && removed.size() == 0) {
         // nothing to upsync.  Use a singleshot to avoid synchronously
@@ -715,12 +715,12 @@ void CardDav::upsyncUpdates(const QString &addressbookUrl, const QList<QContact>
             QContactGuid cguid = c.detail<QContactGuid>();
             QString guidstr = c.detail<QContactGuid>().guid();
             if (guidstr.isEmpty()) {
-                qWarning() << Q_FUNC_INFO << "modified contact has no guid:" << c.id().toString();
+                LOG_WARNING(Q_FUNC_INFO << "modified contact has no guid:" << c.id().toString());
                 continue; // TODO: this is actually an error.
             }
             QString uidstr = q->m_contactUids[guidstr];
             if (uidstr.isEmpty()) {
-                qWarning() << Q_FUNC_INFO << "modified contact server uid unknown:" << c.id().toString() << guidstr;
+                LOG_WARNING(Q_FUNC_INFO << "modified contact server uid unknown:" << c.id().toString() << guidstr);
                 continue; // TODO: this is actually an error.
             }
             cguid.setGuid(uidstr);
@@ -773,8 +773,8 @@ void CardDav::upsyncResponse()
     QString guid = reply->property("contactGuid").toString();
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
-        qWarning() << Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")";
+        LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
+                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
         debugDumpData(QString::fromUtf8(data));
         errorOccurred();
         return;
@@ -805,7 +805,7 @@ void CardDav::upsyncComplete()
     m_upsyncRequests -= 1;
     if (m_upsyncRequests == 0) {
         // finished upsyncing all data for all addressbooks.
-        qDebug() << Q_FUNC_INFO << "upsync complete";
+        LOG_DEBUG(Q_FUNC_INFO << "upsync complete");
         emit upsyncCompleted();
     }
 }

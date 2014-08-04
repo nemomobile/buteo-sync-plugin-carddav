@@ -36,8 +36,6 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
 
-#include <QtDebug>
-
 #include <QtContacts/QContact>
 #include <QtContacts/QContactManager>
 #include <QtContacts/QContactGuid>
@@ -50,6 +48,7 @@
 #include <Accounts/Account>
 
 #include <SyncProfile.h>
+#include <LogMacros.h>
 
 #define CARDDAV_CONTACTS_SYNCTARGET QLatin1String("carddav")
 
@@ -81,7 +80,7 @@ void Syncer::startSync(int accountId)
             this, SLOT(sync(QString,QString,QString,QString)));
     connect(m_auth, SIGNAL(signInError()),
             this, SLOT(signInError()));
-    qDebug() << Q_FUNC_INFO << "starting carddav sync with account" << m_accountId;
+    LOG_DEBUG(Q_FUNC_INFO << "starting carddav sync with account" << m_accountId);
     m_auth->signIn(accountId);
 }
 
@@ -101,7 +100,7 @@ void Syncer::sync(const QString &serverUrl, const QString &username, const QStri
     if (!initSyncAdapter(QString::number(m_accountId))
             || !readSyncStateData(&remoteSince, QString::number(m_accountId))
             || !readExtraStateData(m_accountId)) {
-        qWarning() << Q_FUNC_INFO << "unable to init carddav sync for account" << m_accountId;
+        LOG_WARNING(Q_FUNC_INFO << "unable to init carddav sync for account" << m_accountId);
         cardDavError();
         return;
     }
@@ -133,11 +132,11 @@ void Syncer::continueSync(const QList<QContact> &added, const QList<QContact> &m
 {
     // store the remote changes locally
     QList<QContact> addMod = added+modified, del = removed;
-    qDebug() << Q_FUNC_INFO << "storing remote changes to local device: AMR:"
+    LOG_DEBUG(Q_FUNC_INFO << "storing remote changes to local device: AMR:"
              << added.count() << modified.count() << removed.count()
-             << "for account:" << m_accountId;
+             << "for account:" << m_accountId);
     if (!storeRemoteChanges(del, &addMod, QString::number(m_accountId))) {
-        qWarning() << Q_FUNC_INFO << "unable to store remote changes for account" << m_accountId;
+        LOG_WARNING(Q_FUNC_INFO << "unable to store remote changes for account" << m_accountId);
         cardDavError();
         return;
     }
@@ -146,8 +145,8 @@ void Syncer::continueSync(const QList<QContact> &added, const QList<QContact> &m
     // this is necessary especially for added contacts, which previously had no id.
     Q_FOREACH (const QContact &c, addMod) {
         if (c.id().isNull()) {
-            qWarning() << Q_FUNC_INFO << "no contact id specified for contact with guid"
-                       << c.detail<QContactGuid>().guid() << "from account" << m_accountId;
+            LOG_WARNING(Q_FUNC_INFO << "no contact id specified for contact with guid"
+                       << c.detail<QContactGuid>().guid() << "from account" << m_accountId);
             cardDavError();
             return;
         } else {
@@ -159,7 +158,7 @@ void Syncer::continueSync(const QList<QContact> &added, const QList<QContact> &m
     QDateTime localSince;
     QList<QContact> locallyAdded, locallyModified, locallyDeleted;
     if (!determineLocalChanges(&localSince, &locallyAdded, &locallyModified, &locallyDeleted, QString::number(m_accountId))) {
-        qWarning() << Q_FUNC_INFO << "unable to determine local changes for account" << m_accountId;
+        LOG_WARNING(Q_FUNC_INFO << "unable to determine local changes for account" << m_accountId);
         cardDavError();
         return;
     }
@@ -167,7 +166,7 @@ void Syncer::continueSync(const QList<QContact> &added, const QList<QContact> &m
     if (!m_syncProfile || m_syncProfile->syncDirection() != Buteo::SyncProfile::SYNC_DIRECTION_FROM_REMOTE) {
         upsyncLocalChanges(localSince, locallyAdded, locallyModified, locallyDeleted, QString::number(m_accountId));
     } else {
-        qDebug() << Q_FUNC_INFO << "skipping upsync due to sync profile direction setting";
+        LOG_DEBUG(Q_FUNC_INFO << "skipping upsync due to sync profile direction setting");
         syncFinished();
     }
 }
@@ -178,9 +177,9 @@ void Syncer::upsyncLocalChanges(const QDateTime &,
                                 const QList<QContact> &locallyDeleted,
                                 const QString &)
 {
-    qDebug() << Q_FUNC_INFO << "upsyncing local changes to remove server: AMR:"
+    LOG_DEBUG(Q_FUNC_INFO << "upsyncing local changes to remove server: AMR:"
              << locallyAdded.count() << locallyModified.count() << locallyDeleted.count()
-             << "for account:" << m_accountId;
+             << "for account:" << m_accountId);
 
     // segment the changes according to the addressbook the contacts are from
     QSet<QString> modifiedAddressbookUrls;
@@ -200,7 +199,7 @@ void Syncer::upsyncLocalChanges(const QDateTime &,
                                  : QString();
     }
     if (addedContactsAddressbook.isEmpty()) {
-        qWarning() << Q_FUNC_INFO << "no known addressbooks, failing";
+        LOG_WARNING(Q_FUNC_INFO << "no known addressbooks, failing");
         cardDavError();
         return;
     }
@@ -244,12 +243,12 @@ void Syncer::syncFinished()
 {
     // finished upsync.  Just need to store our state data and we're done.
     if (!storeExtraStateData(m_accountId) || !storeSyncStateData(QString::number(m_accountId))) {
-        qWarning() << Q_FUNC_INFO << "unable to finalise sync state";
+        LOG_WARNING(Q_FUNC_INFO << "unable to finalise sync state");
         cardDavError(); // actually in this case we have already stored stuff to local and server...?
         return;
     }
 
-    qDebug() << Q_FUNC_INFO << "carddav sync with account" << m_accountId << "finished successfully!";
+    LOG_DEBUG(Q_FUNC_INFO << "carddav sync with account" << m_accountId << "finished successfully!");
 
     // Success.
     emit syncSucceeded();
@@ -271,8 +270,8 @@ void Syncer::purgeAccount(int accountId)
     if (contactsToRemove.size()) {
         success = m_contactManager.removeContacts(contactsToRemove);
         if (!success) {
-            qWarning() << "Failed to remove stale contacts during purge of account" << accountId
-                       << ":" << m_contactManager.error();
+            LOG_WARNING("Failed to remove stale contacts during purge of account" << accountId
+                       << ":" << m_contactManager.error());
         }
     }
 
@@ -286,12 +285,12 @@ void Syncer::purgeAccount(int accountId)
     QString oobScope = QStringLiteral("%1-%2").arg(CARDDAV_CONTACTS_SYNCTARGET).arg(accountId);
     if (!d->m_engine->removeOOB(oobScope)) {
         success = false;
-        qWarning() << Q_FUNC_INFO << "Error occurred while purging OOB data for removed CardDAV account" << accountId;
+        LOG_WARNING(Q_FUNC_INFO << "Error occurred while purging OOB data for removed CardDAV account" << accountId);
     }
 
     if (success) {
-        qDebug() << Q_FUNC_INFO << "Purged account" << accountId
-                 << "and successfully removed" << contactsToRemove.size() << "contacts";
+        LOG_DEBUG(Q_FUNC_INFO << "Purged account" << accountId
+                 << "and successfully removed" << contactsToRemove.size() << "contacts");
     }
 }
 
@@ -309,7 +308,7 @@ bool Syncer::readExtraStateData(int accountId)
          << QStringLiteral("contactIds")
          << QStringLiteral("contactUnsupportedProperties");
     if (!d->m_engine->fetchOOB(d->m_stateData[QString::number(accountId)].m_oobScope, keys, &values)) {
-        qWarning() << Q_FUNC_INFO << "failed to read extra data for carddav account" << accountId;
+        LOG_WARNING(Q_FUNC_INFO << "failed to read extra data for carddav account" << accountId);
         d->clear(QString::number(accountId));
         return false;
     }
@@ -433,7 +432,7 @@ bool Syncer::readExtraStateData(int accountId)
                                             0,
                                             &maxTimestamp,
                                             &error)) {
-            qWarning() << Q_FUNC_INFO << "failed to fetch pre-existing contacts for account" << m_accountId;
+            LOG_WARNING(Q_FUNC_INFO << "failed to fetch pre-existing contacts for account" << m_accountId);
             d->clear(QString::number(accountId));
             return false;
         }
@@ -544,7 +543,7 @@ bool Syncer::storeExtraStateData(int accountId)
     values.insert("contactIds", ciValue);
     values.insert("contactUnsupportedProperties", cupValue);
     if (!d->m_engine->storeOOB(d->m_stateData[QString::number(accountId)].m_oobScope, values)) {
-        qWarning() << Q_FUNC_INFO << "failed to store extra state data for carddav account" << accountId;
+        LOG_WARNING(Q_FUNC_INFO << "failed to store extra state data for carddav account" << accountId);
         d->clear(QString::number(accountId));
         return false;
     }

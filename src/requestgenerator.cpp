@@ -23,6 +23,8 @@
 #include "requestgenerator_p.h"
 #include "syncer_p.h"
 
+#include <LogMacros.h>
+
 #include <QUrl>
 #include <QUrlQuery>
 #include <QNetworkRequest>
@@ -31,8 +33,6 @@
 #include <QStringList>
 #include <QBuffer>
 #include <QByteArray>
-
-#include <QtDebug>
 
 #include <QtContacts/QContact>
 
@@ -83,7 +83,7 @@ QNetworkReply *RequestGenerator::generateRequest(const QString &url,
 
     QBuffer *requestDataBuffer = new QBuffer(q);
     requestDataBuffer->setData(requestData);
-/*  qWarning() << "generateRequest():" << m_accessToken << url << path << depth << requestType << QString::fromUtf8(requestData);  */
+/*  LOG_WARNING("generateRequest():" << m_accessToken << url << path << depth << requestType << QString::fromUtf8(requestData));  */
     return q->m_qnam.sendCustomRequest(req, requestType.toLatin1(), requestDataBuffer);
 }
 
@@ -133,7 +133,7 @@ QNetworkReply *RequestGenerator::generateUpsyncRequest(const QString &url,
 QNetworkReply *RequestGenerator::currentUserInformation(const QString &serverUrl)
 {
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "server url empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
         return 0;
     }
 
@@ -150,12 +150,12 @@ QNetworkReply *RequestGenerator::currentUserInformation(const QString &serverUrl
 QNetworkReply *RequestGenerator::addressbookUrls(const QString &serverUrl, const QString &userPath)
 {
     if (Q_UNLIKELY(userPath.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "user path empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "user path empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "server url empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
         return 0;
     }
 
@@ -172,12 +172,12 @@ QNetworkReply *RequestGenerator::addressbookUrls(const QString &serverUrl, const
 QNetworkReply *RequestGenerator::addressbooksInformation(const QString &serverUrl, const QString &userAddressbooksPath)
 {
     if (Q_UNLIKELY(userAddressbooksPath.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "addressbooks path empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "addressbooks path empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "server url empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
         return 0;
     }
 
@@ -196,12 +196,12 @@ QNetworkReply *RequestGenerator::addressbooksInformation(const QString &serverUr
 QNetworkReply *RequestGenerator::addressbookInformation(const QString &serverUrl, const QString &addressbookPath)
 {
     if (Q_UNLIKELY(addressbookPath.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "addressbook path empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "addressbook path empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "server url empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
         return 0;
     }
 
@@ -219,17 +219,17 @@ QNetworkReply *RequestGenerator::addressbookInformation(const QString &serverUrl
 QNetworkReply *RequestGenerator::syncTokenDelta(const QString &serverUrl, const QString &addressbookUrl, const QString &syncToken)
 {
     if (Q_UNLIKELY(syncToken.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "sync token empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "sync token empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(addressbookUrl.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "addressbook url empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "addressbook url empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "server url empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
         return 0;
     }
 
@@ -249,12 +249,12 @@ QNetworkReply *RequestGenerator::syncTokenDelta(const QString &serverUrl, const 
 QNetworkReply *RequestGenerator::contactEtags(const QString &serverUrl, const QString &addressbookPath)
 {
     if (Q_UNLIKELY(addressbookPath.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "addressbook path empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "addressbook path empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "server url empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
         return 0;
     }
 
@@ -271,17 +271,17 @@ QNetworkReply *RequestGenerator::contactEtags(const QString &serverUrl, const QS
 QNetworkReply *RequestGenerator::contactData(const QString &serverUrl, const QString &addressbookPath, const QStringList &contactEtags)
 {
     if (Q_UNLIKELY(contactEtags.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "etag list empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "etag list empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(addressbookPath.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "addressbook path empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "addressbook path empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "server url empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
         return 0;
     }
 
@@ -303,17 +303,17 @@ QNetworkReply *RequestGenerator::contactData(const QString &serverUrl, const QSt
 QNetworkReply *RequestGenerator::contactMultiget(const QString &serverUrl, const QString &addressbookPath, const QStringList &contactUris)
 {
     if (Q_UNLIKELY(contactUris.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "etag list empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "etag list empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(addressbookPath.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "addressbook path empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "addressbook path empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "server url empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
         return 0;
     }
 
@@ -342,19 +342,19 @@ QNetworkReply *RequestGenerator::contactMultiget(const QString &serverUrl, const
 QNetworkReply *RequestGenerator::upsyncAddMod(const QString &serverUrl, const QString &contactPath, const QString &etag, const QString &vcard)
 {
     if (Q_UNLIKELY(vcard.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "vcard empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "vcard empty, aborting");
         return 0;
     }
 
     // the etag can be empty if it's an addition
 
     if (Q_UNLIKELY(contactPath.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "contact uri empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "contact uri empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "server url empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
         return 0;
     }
 
@@ -366,17 +366,17 @@ QNetworkReply *RequestGenerator::upsyncAddMod(const QString &serverUrl, const QS
 QNetworkReply *RequestGenerator::upsyncDeletion(const QString &serverUrl, const QString &contactPath, const QString &etag)
 {
     if (Q_UNLIKELY(etag.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "etag empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "etag empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(contactPath.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "contact uri empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "contact uri empty, aborting");
         return 0;
     }
 
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
-        qWarning() << Q_FUNC_INFO << "server url empty, aborting";
+        LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
         return 0;
     }
 
