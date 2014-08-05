@@ -584,7 +584,16 @@ void CardDav::contactsResponse()
             q->m_contactUnsupportedProperties[guid] = it.value().unsupportedProperties;
             // Note: for additions, q->m_contactUids will have been filled out by the reply parser.
             q->m_addressbookContactGuids[addressbookUrl].append(guid);
-            added.append(it.value().contact);
+            // Check to see if this server-side addition is actually just
+            // a reported previously-upsynced local-side addition.
+            if (q->m_contactIds.contains(guid)) {
+                QContact previouslyUpsynced = it.value().contact;
+                previouslyUpsynced.setId(QContactId::fromString(q->m_contactIds[guid]));
+                added.append(previouslyUpsynced);
+            } else {
+                // pure server-side addition.
+                added.append(it.value().contact);
+            }
         } else if (q->m_serverModificationIndices[addressbookUrl].contains(it.key())) {
             QContact c = it.value().contact;
             QString guid = c.detail<QContactGuid>().guid();

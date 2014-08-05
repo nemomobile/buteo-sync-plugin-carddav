@@ -177,7 +177,7 @@ void Syncer::upsyncLocalChanges(const QDateTime &,
                                 const QList<QContact> &locallyDeleted,
                                 const QString &)
 {
-    LOG_DEBUG(Q_FUNC_INFO << "upsyncing local changes to remove server: AMR:"
+    LOG_DEBUG(Q_FUNC_INFO << "upsyncing local changes to remote server: AMR:"
              << locallyAdded.count() << locallyModified.count() << locallyDeleted.count()
              << "for account:" << m_accountId);
 
