@@ -83,7 +83,9 @@ QNetworkReply *RequestGenerator::generateRequest(const QString &url,
 
     QBuffer *requestDataBuffer = new QBuffer(q);
     requestDataBuffer->setData(requestData);
-/*  LOG_WARNING("generateRequest():" << m_accessToken << url << path << depth << requestType << QString::fromUtf8(requestData));  */
+    LOG_DEBUG("generateRequest():"
+            << m_accessToken << url << path << depth << requestType
+            << QString::fromUtf8(requestData));
     return q->m_qnam.sendCustomRequest(req, requestType.toLatin1(), requestDataBuffer);
 }
 

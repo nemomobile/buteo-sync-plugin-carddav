@@ -35,6 +35,28 @@
 #include <QContactGuid>
 
 namespace {
+    void debugDumpData(const QString &data)
+    {
+        if (Buteo::Logger::instance()->getLogLevel() < 7) {
+            return;
+        }
+
+        QString dbgout;
+        Q_FOREACH (const QChar &c, data) {
+            if (c == '\r' || c == '\n') {
+                if (!dbgout.isEmpty()) {
+                    LOG_DEBUG(dbgout);
+                    dbgout.clear();
+                }
+            } else {
+                dbgout += c;
+            }
+        }
+        if (!dbgout.isEmpty()) {
+            LOG_DEBUG(dbgout);
+        }
+    }
+
     QVariantMap elementToVMap(QXmlStreamReader &reader)
     {
         QVariantMap element;
@@ -121,6 +143,7 @@ QString ReplyParser::parseUserPrinciple(const QByteArray &userInformationRespons
             </d:response>
         </d:multistatus>
     */
+    debugDumpData(QString::fromUtf8(userInformationResponse));
     QXmlStreamReader reader(userInformationResponse);
     QString statusText;
     QString userPrinciple;
@@ -165,6 +188,7 @@ QString ReplyParser::parseAddressbookHome(const QByteArray &addressbookUrlsRespo
             </d:response>
         </d:multistatus>
     */
+    debugDumpData(QString::fromUtf8(addressbookUrlsResponse));
     QXmlStreamReader reader(addressbookUrlsResponse);
     QString statusText;
     QString addressbookHome;
@@ -206,6 +230,7 @@ QList<ReplyParser::AddressBookInformation> ReplyParser::parseAddressbookInformat
             </d:response>
         </d:multistatus>
     */
+    debugDumpData(QString::fromUtf8(addressbookInformationResponse));
     QXmlStreamReader reader(addressbookInformationResponse);
     QList<ReplyParser::AddressBookInformation> infos;
 
@@ -279,6 +304,7 @@ QList<ReplyParser::ContactInformation> ReplyParser::parseSyncTokenDelta(const QB
             <d:sync-token>http://sabredav.org/ns/sync/5001</d:sync-token>
          </d:multistatus>
     */
+    debugDumpData(QString::fromUtf8(syncTokenDeltaResponse));
     QList<ReplyParser::ContactInformation> info;
     QXmlStreamReader reader(syncTokenDeltaResponse);
     QVariantMap vmap = xmlToVMap(reader);
@@ -351,6 +377,7 @@ QList<ReplyParser::ContactInformation> ReplyParser::parseContactMetadata(const Q
             </d:response>
         </d:multistatus>
     */
+    debugDumpData(QString::fromUtf8(contactMetadataResponse));
     QList<ReplyParser::ContactInformation> info;
     QXmlStreamReader reader(contactMetadataResponse);
     QVariantMap vmap = xmlToVMap(reader);
@@ -452,6 +479,7 @@ QMap<QString, ReplyParser::FullContactInformation> ReplyParser::parseContactData
             </d:response>
         </d:multistatus>
     */
+    debugDumpData(QString::fromUtf8(contactData));
     QXmlStreamReader reader(contactData);
     QVariantMap vmap = xmlToVMap(reader);
     QVariantMap multistatusMap = vmap[QLatin1String("multistatus")].toMap();

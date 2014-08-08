@@ -44,6 +44,10 @@
 namespace {
     void debugDumpData(const QString &data)
     {
+        if (Buteo::Logger::instance()->getLogLevel() < 7) {
+            return;
+        }
+
         QString dbgout;
         Q_FOREACH (const QChar &c, data) {
             if (c == '\r' || c == '\n') {
@@ -143,10 +147,8 @@ QString CardDavVCardConverter::convertContactToVCard(const QContact &c, const QS
         }
     }
 
-/*
     LOG_DEBUG("generated vcard:");
     debugDumpData(retn);
-*/
 
     return retn;
 }
