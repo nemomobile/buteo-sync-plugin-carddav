@@ -273,7 +273,7 @@ void CardDav::errorOccurred()
 void CardDav::determineRemoteAMR()
 {
     // The CardDAV sequence for determining the A/M/R delta is:
-    // a)  fetch user information from the principle URL
+    // a)  fetch user information from the principal URL
     // b)  fetch addressbooks home url
     // c)  fetch addressbook information
     // d)  for each addressbook, either:
@@ -287,7 +287,7 @@ void CardDav::determineRemoteAMR()
 
 void CardDav::fetchUserInformation()
 {
-    LOG_DEBUG(Q_FUNC_INFO << "requesting principle urls for user");
+    LOG_DEBUG(Q_FUNC_INFO << "requesting principal urls for user");
     QNetworkReply *reply = m_request->currentUserInformation(m_serverUrl);
     if (!reply) {
         emit error();
@@ -309,14 +309,30 @@ void CardDav::userInformationResponse()
         return;
     }
 
-    QString userPath = m_parser->parseUserPrinciple(data);
-    if (userPath.isEmpty()) {
-        LOG_WARNING(Q_FUNC_INFO << "unable to parse user principle from response");
+    ReplyParser::ResponseType responseType = ReplyParser::UserPrincipalResponse;
+    QString userPath = m_parser->parseUserPrincipal(data, &responseType);
+    if (responseType == ReplyParser::UserPrincipalResponse) {
+        // the server responded with the expected user principal information.
+        if (userPath.isEmpty()) {
+            LOG_WARNING(Q_FUNC_INFO << "unable to parse user principal from response");
+            emit error();
+            return;
+        }
+        fetchAddressbookUrls(userPath);
+    } else if (responseType == ReplyParser::AddressbookInformationResponse) {
+        // the server responded with addressbook information instead
+        // of user principal information.  Skip the next discovery step.
+        QList<ReplyParser::AddressBookInformation> infos = m_parser->parseAddressbookInformation(data);
+        if (infos.isEmpty()) {
+            LOG_WARNING(Q_FUNC_INFO << "unable to parse addressbook info from user principal response");
+            emit error();
+            return;
+        }
+        downsyncAddressbookContent(infos);
+    } else {
+        LOG_WARNING(Q_FUNC_INFO << "unknown response from user principal request");
         emit error();
-        return;
     }
-
-    fetchAddressbookUrls(userPath);
 }
 
 void CardDav::fetchAddressbookUrls(const QString &userPath)
@@ -384,6 +400,11 @@ void CardDav::addressbooksInformationResponse()
         return;
     }
 
+    downsyncAddressbookContent(infos);
+}
+
+void CardDav::downsyncAddressbookContent(const QList<ReplyParser::AddressBookInformation> &infos)
+{
     // for addressbooks which support sync-token syncing, use that style.
     for (int i = 0; i < infos.size(); ++i) {
         // set a default addressbook if we haven't seen one yet.

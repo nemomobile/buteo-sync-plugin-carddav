@@ -73,6 +73,7 @@ private:
     void fetchUserInformation();
     void fetchAddressbookUrls(const QString &userPath);
     void fetchAddressbooksInformation(const QString &addressbooksHomePath);
+    void downsyncAddressbookContent(const QList<ReplyParser::AddressBookInformation> &infos);
     void fetchImmediateDelta(const QString &addressbookUrl, const QString &syncToken);
     void fetchContactMetadata(const QString &addressbookUrl);
     void fetchContacts(const QString &addressbookUrl, const QList<ReplyParser::ContactInformation> &amrInfo);
