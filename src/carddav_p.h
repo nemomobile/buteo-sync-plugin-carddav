@@ -97,6 +97,7 @@ private:
     RequestGenerator *m_request;
     ReplyParser *m_parser;
     QString m_serverUrl;
+    QString m_username;
 
     QList<QContact> m_remoteAdditions;
     QList<QContact> m_remoteModifications;

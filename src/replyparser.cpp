@@ -188,9 +188,9 @@ QString ReplyParser::parseAddressbookHome(const QByteArray &addressbookUrlsRespo
                 <d:href>/</d:href>
                 <d:propstat>
                     <d:prop>
-                        <c:addressbook-home-set>
+                        <card:addressbook-home-set>
                             <d:href>/addressbooks/johndoe/</d:href>
-                        </c:addressbook-home-set>
+                        </card:addressbook-home-set>
                     </d:prop>
                     <d:status>HTTP/1.1 200 OK</d:status>
                 </d:propstat>

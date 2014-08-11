@@ -63,6 +63,23 @@ namespace {
             LOG_DEBUG(dbgout);
         }
     }
+
+    QString knownDefaultAddressbookPath(const QString &serverUrl, const QString &userName)
+    {
+        if (serverUrl.contains("carddav.address.yahoo.com", Qt::CaseInsensitive)) {
+            return QStringLiteral("dav/%1/Contacts/").arg(userName);
+        } else if (serverUrl.contains("owncloud.de")) {
+            return QStringLiteral("owncloud/remote.php/carddav/addressbooks/%1/contacts/").arg(userName);
+        } else if (serverUrl.contains("dav.fruux.com")) {
+            return QStringLiteral("addressbooks/%1/default/").arg(userName);
+        } else if (serverUrl.contains("dav.fruux.org")) {
+            return QStringLiteral("addressbooks/%1/default/").arg(userName);
+        } else if (serverUrl.contains("google.com")) {
+            return QStringLiteral("m8/carddav/principals/__uids__/%1/lists/default/").arg(userName);
+        }
+
+        return QString();
+    }
 }
 
 CardDavVCardConverter::CardDavVCardConverter()
@@ -239,6 +256,7 @@ CardDav::CardDav(Syncer *parent,
     , m_request(new RequestGenerator(q, username, password))
     , m_parser(new ReplyParser(q, m_converter))
     , m_serverUrl(serverUrl)
+    , m_username(username)
     , m_downsyncRequests(0)
     , m_upsyncRequests(0)
 {
@@ -344,6 +362,7 @@ void CardDav::fetchAddressbookUrls(const QString &userPath)
         return;
     }
 
+    reply->setProperty("userPath", userPath);
     connect(reply, SIGNAL(finished()), this, SLOT(addressbookUrlsResponse()));
 }
 
@@ -351,11 +370,26 @@ void CardDav::addressbookUrlsResponse()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     QByteArray data = reply->readAll();
+    QString userPath = reply->property("userPath").toString();
     if (reply->error() != QNetworkReply::NoError) {
-        LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
-        debugDumpData(QString::fromUtf8(data));
-        errorOccurred();
+        if (reply->error() == QNetworkReply::ContentNotFoundError) {
+            // some servers return 404 to addressbook home set urls requests.
+            // in this case, we can try treating the user path as an addressbook home url,
+            // or we can try the default addressbook home set url for that server.
+            QString defaultPath = knownDefaultAddressbookPath(m_serverUrl, m_username);
+            if (defaultPath.isEmpty()) {
+                LOG_DEBUG(Q_FUNC_INFO << "not found response returned for addressbook home set request, trying user path");
+                fetchAddressbooksInformation(userPath);
+            } else {
+                LOG_DEBUG(Q_FUNC_INFO << "not found response returned for addressbook home set request, trying default path:" << defaultPath);
+                fetchAddressbooksInformation(defaultPath);
+            }
+        } else {
+            LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
+                       << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
+            debugDumpData(QString::fromUtf8(data));
+            errorOccurred();
+        }
         return;
     }
 
