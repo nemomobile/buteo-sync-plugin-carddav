@@ -67,10 +67,17 @@ public:
         QString etag;
     };
 
+    enum ResponseType {
+        UserPrincipalResponse = 0,
+        AddressbookHomeResponse,
+        AddressbookInformationResponse,
+        ContactDataResponse
+    };
+
     ReplyParser(Syncer *parent, CardDavVCardConverter *converter);
     ~ReplyParser();
 
-    QString parseUserPrinciple(const QByteArray &userInformationResponse) const;
+    QString parseUserPrincipal(const QByteArray &userInformationResponse, ResponseType *responseType) const;
     QString parseAddressbookHome(const QByteArray &addressbookUrlsResponse) const;
     QList<AddressBookInformation> parseAddressbookInformation(const QByteArray &addressbookInformationResponse) const;
     QList<ContactInformation> parseSyncTokenDelta(const QByteArray &syncTokenDeltaResponse, QString *newSyncToken) const;

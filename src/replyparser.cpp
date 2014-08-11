@@ -123,7 +123,7 @@ ReplyParser::~ReplyParser()
 {
 }
 
-QString ReplyParser::parseUserPrinciple(const QByteArray &userInformationResponse) const
+QString ReplyParser::parseUserPrincipal(const QByteArray &userInformationResponse, ReplyParser::ResponseType *responseType) const
 {
     /* We expect a response of the form:
         HTTP/1.1 207 Multi-status
@@ -142,30 +142,39 @@ QString ReplyParser::parseUserPrinciple(const QByteArray &userInformationRespons
                 </d:propstat>
             </d:response>
         </d:multistatus>
+
+      Note however that some CardDAV servers return addressbook
+      information instead of user principal information.
     */
     debugDumpData(QString::fromUtf8(userInformationResponse));
     QXmlStreamReader reader(userInformationResponse);
-    QString statusText;
-    QString userPrinciple;
-
-    while (!reader.atEnd() && !reader.hasError()) {
-        QXmlStreamReader::TokenType token = reader.readNext();
-        if (token == QXmlStreamReader::StartElement) {
-            if (reader.name().toString() == QLatin1String("current-user-principal")) {
-                if (reader.readNextStartElement() && reader.name().toString() == QLatin1String("href")) {
-                    userPrinciple = reader.readElementText();
-                }
-            } else if (reader.name().toString() == QLatin1String("status")) {
-                statusText = reader.readElementText();
-            }
-        }
+    QVariantMap vmap = xmlToVMap(reader);
+    QVariantMap multistatusMap = vmap[QLatin1String("multistatus")].toMap();
+    if (multistatusMap[QLatin1String("response")].type() == QVariant::List) {
+        // This should not be the case for a UserPrincipal response.
+        *responseType = ReplyParser::AddressbookInformationResponse;
+        return QString();
     }
+
+    // Only one response - this could be either a UserPrincipal response
+    // or an AddressbookInformation response.
+    QVariantMap response = multistatusMap[QLatin1String("response")].toMap();
+    QString statusText = response.value("propstat").toMap().value("status").toMap().value("@text").toString();
+    QString userPrincipal = response.value("propstat").toMap().value("prop").toMap()
+            .value("current-user-principal").toMap().value("href").toMap().value("@text").toString();
+    QString ctag = response.value("propstat").toMap().value("prop").toMap().value("getctag").toMap().value("@text").toString();
 
     if (!statusText.contains(QLatin1String("200 OK"))) {
         LOG_WARNING(Q_FUNC_INFO << "invalid status response to current user information request:" << statusText);
+    } else if (userPrincipal.isEmpty() && !ctag.isEmpty()) {
+        // this server has responded with an addressbook information response.
+        LOG_DEBUG(Q_FUNC_INFO << "addressbook information response to current user information request:" << statusText);
+        *responseType = ReplyParser::AddressbookInformationResponse;
+        return QString();
     }
 
-    return userPrinciple;
+    *responseType = ReplyParser::UserPrincipalResponse;
+    return userPrincipal;
 }
 
 QString ReplyParser::parseAddressbookHome(const QByteArray &addressbookUrlsResponse) const
@@ -254,7 +263,16 @@ QList<ReplyParser::AddressBookInformation> ReplyParser::parseAddressbookInformat
         currInfo.syncToken = rmap.value("propstat").toMap().value("prop").toMap().value("sync-token").toMap().value("@text").toString();
         currInfo.displayName = rmap.value("propstat").toMap().value("prop").toMap().value("displayname").toMap().value("@text").toString();
         QStringList resourceTypeKeys = rmap.value("propstat").toMap().value("prop").toMap().value("resourcetype").toMap().keys();
-        if (!resourceTypeKeys.contains(QStringLiteral("addressbook"), Qt::CaseInsensitive)) {
+        if (resourceTypeKeys.isEmpty()
+                || (resourceTypeKeys.size() == 1 && resourceTypeKeys.contains(QStringLiteral("collection"), Qt::CaseInsensitive))
+                || (resourceTypeKeys.contains(QStringLiteral("addressbook"), Qt::CaseInsensitive))) {
+            // This is probably a carddav addressbook collection.
+            // Despite section 5.2 of RFC6352 stating that a CardDAV
+            // server MUST return the 'addressbook' value in the resource types
+            // property, some CardDAV implementations (eg, Memotoo) do not.
+            LOG_DEBUG(Q_FUNC_INFO << "parsing information for addressbook:" << currInfo.url);
+        } else {
+            // the resource is explicitly described as non-addressbook resource.
             LOG_DEBUG(Q_FUNC_INFO << "ignoring non-addressbook response");
             continue;
         }
@@ -336,6 +354,12 @@ QList<ReplyParser::ContactInformation> ReplyParser::parseSyncTokenDelta(const QB
         }
         QString status = rmap.value("propstat").toMap().value("status").toMap().value("@text").toString();
         if (status.contains(QLatin1String("200 OK"))) {
+            if (!currInfo.uri.endsWith(QStringLiteral(".vcf"), Qt::CaseInsensitive) && currInfo.etag.isEmpty()) {
+                // this is probably a response for the addressbook resource,
+                // rather than for a contact resource within the addressbook.
+                LOG_DEBUG(Q_FUNC_INFO << "ignoring non-contact resource:" << currInfo.uri << currInfo.etag << status);
+                continue;
+            }
             currInfo.modType = currInfo.guid.isEmpty()
                              ? ReplyParser::ContactInformation::Addition
                              : ReplyParser::ContactInformation::Modification;
@@ -398,13 +422,19 @@ QList<ReplyParser::ContactInformation> ReplyParser::parseContactMetadata(const Q
         ReplyParser::ContactInformation currInfo;
         currInfo.uri = rmap.value("href").toMap().value("@text").toString();
         currInfo.etag = rmap.value("propstat").toMap().value("prop").toMap().value("getetag").toMap().value("@text").toString();
+        QString status = rmap.value("propstat").toMap().value("status").toMap().value("@text").toString();
+        if (!currInfo.uri.endsWith(QStringLiteral(".vcf"), Qt::CaseInsensitive) && currInfo.etag.isEmpty()) {
+            // this is probably a response for the addressbook resource,
+            // rather than for a contact resource within the addressbook.
+            LOG_DEBUG(Q_FUNC_INFO << "ignoring non-contact resource:" << currInfo.uri << currInfo.etag << status);
+            continue;
+        }
         QMap<QString, QString>::const_iterator it = q->m_contactUris.constBegin();
         for ( ; it != q->m_contactUris.constEnd(); ++it) {
             if (it.value() == currInfo.uri) {
                 currInfo.guid = it.key();
             }
         }
-        QString status = rmap.value("propstat").toMap().value("status").toMap().value("@text").toString();
         if (status.contains(QLatin1String("200 OK"))) {
             seenUris.insert(currInfo.uri);
             currInfo.modType = currInfo.guid.isEmpty()
