@@ -40,6 +40,7 @@ public:
     ~Auth();
 
     void signIn(int accountId);
+    void setCredentialsNeedUpdate(int accountId);
 
 Q_SIGNALS:
     void signInCompleted(const QString &serverUrl, const QString &username, const QString &password, const QString &accessToken);

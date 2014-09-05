@@ -166,3 +166,20 @@ void Auth::signOnError(const SignOn::Error &error)
     emit signInError();
     return;
 }
+
+void Auth::setCredentialsNeedUpdate(int accountId)
+{
+    Accounts::Account *account = m_manager.account(accountId);
+    if (account) {
+        Accounts::ServiceList services = account->services();
+        Q_FOREACH (const Accounts::Service &s, services) {
+            if (s.serviceType().toLower() == QStringLiteral("carddav")) {
+                account->setValue(QStringLiteral("CredentialsNeedUpdate"), QVariant::fromValue<bool>(true));
+                account->setValue(QStringLiteral("CredentialsNeedUpdateFrom"), QVariant::fromValue<QString>(QString::fromLatin1("carddav-sync")));
+                account->selectService(Accounts::Service());
+                account->syncAndBlock();
+                break;
+            }
+        }
+    }
+}

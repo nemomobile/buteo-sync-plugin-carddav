@@ -265,9 +265,9 @@ CardDav::~CardDav()
     delete m_request;
 }
 
-void CardDav::errorOccurred()
+void CardDav::errorOccurred(int httpError)
 {
-    emit error();
+    emit error(httpError);
 }
 
 void CardDav::determineRemoteAMR()
@@ -302,10 +302,11 @@ void CardDav::userInformationResponse()
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
+        int httpError = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
+                   << "(" << httpError << ")");
         debugDumpData(QString::fromUtf8(data));
-        errorOccurred();
+        errorOccurred(httpError);
         return;
     }
 
@@ -352,10 +353,11 @@ void CardDav::addressbookUrlsResponse()
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
+        int httpError = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
+                   << "(" << httpError << ")");
         debugDumpData(QString::fromUtf8(data));
-        errorOccurred();
+        errorOccurred(httpError);
         return;
     }
 
@@ -386,10 +388,11 @@ void CardDav::addressbooksInformationResponse()
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
+        int httpError = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
+                   << "(" << httpError << ")");
         debugDumpData(QString::fromUtf8(data));
-        errorOccurred();
+        errorOccurred(httpError);
         return;
     }
 
@@ -521,10 +524,11 @@ void CardDav::contactMetadataResponse()
     QString addressbookUrl = reply->property("addressbookUrl").toString();
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
+        int httpError = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
+                   << "(" << httpError << ")");
         debugDumpData(QString::fromUtf8(data));
-        errorOccurred();
+        errorOccurred(httpError);
         return;
     }
 
@@ -584,10 +588,11 @@ void CardDav::contactsResponse()
     QString addressbookUrl = reply->property("addressbookUrl").toString();
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
+        int httpError = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
+                   << "(" << httpError << ")");
         debugDumpData(QString::fromUtf8(data));
-        errorOccurred();
+        errorOccurred(httpError);
         return;
     }
 
@@ -805,10 +810,11 @@ void CardDav::upsyncResponse()
     QString guid = reply->property("contactGuid").toString();
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
+        int httpError = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() << ")");
+                   << "(" << httpError << ")");
         debugDumpData(QString::fromUtf8(data));
-        errorOccurred();
+        errorOccurred(httpError);
         return;
     }
 
@@ -841,4 +847,3 @@ void CardDav::upsyncComplete()
         emit upsyncCompleted();
     }
 }
-
