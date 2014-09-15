@@ -63,7 +63,7 @@ public:
                        const QList<QContact> &removed);
 
 Q_SIGNALS:
-    void error();
+    void error(int errorCode = 0);
     void remoteChanges(const QList<QContact> &added,
                        const QList<QContact> &modified,
                        const QList<QContact> &removed);
@@ -88,7 +88,7 @@ private Q_SLOTS:
     void downsyncComplete();
     void upsyncResponse();
     void upsyncComplete();
-    void errorOccurred();
+    void errorOccurred(int httpError);
 
 private:
     void contactAddModsComplete(const QString &addressbookUrl);

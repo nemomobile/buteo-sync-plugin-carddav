@@ -51,6 +51,7 @@
 #include <LogMacros.h>
 
 #define CARDDAV_CONTACTS_SYNCTARGET QLatin1String("carddav")
+static const int HTTP_UNAUTHORIZED_ACCESS = 401;
 
 Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
     : QObject(parent), QtContactsSqliteExtensions::TwoWayContactSyncAdapter(CARDDAV_CONTACTS_SYNCTARGET)
@@ -117,14 +118,17 @@ void Syncer::determineRemoteChanges(const QDateTime &, const QString &)
             this, SLOT(continueSync(QList<QContact>,QList<QContact>,QList<QContact>)));
     connect(m_cardDav, SIGNAL(upsyncCompleted()),
             this, SLOT(syncFinished()));
-    connect(m_cardDav, SIGNAL(error()),
-            this, SLOT(cardDavError()));
+    connect(m_cardDav, SIGNAL(error(int)),
+            this, SLOT(cardDavError(int)));
     m_cardDav->determineRemoteAMR();
 }
 
-void Syncer::cardDavError()
+void Syncer::cardDavError(int errorCode)
 {
-    purgeSyncStateData(QString::number(m_accountId));
+    if (errorCode == HTTP_UNAUTHORIZED_ACCESS) {
+        m_auth->setCredentialsNeedUpdate(m_accountId);
+    }
+    purgeSyncStateData(QString::number(m_accountId));   
     emit syncFailed();
 }
 

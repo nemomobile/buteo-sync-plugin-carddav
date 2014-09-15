@@ -79,7 +79,7 @@ private Q_SLOTS:
     void continueSync(const QList<QContact> &added, const QList<QContact> &modified, const QList<QContact> &removed);
     void syncFinished();
     void signInError();
-    void cardDavError();
+    void cardDavError(int errorCode = 0);
 
 private:
     friend class CardDav;
