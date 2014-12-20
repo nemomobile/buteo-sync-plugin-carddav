@@ -231,6 +231,7 @@ void CardDavVCardConverter::detailProcessed(const QContact &, const QContactDeta
 
 CardDav::CardDav(Syncer *parent,
                  const QString &serverUrl,
+                 const QString &addressbookPath,
                  const QString &username,
                  const QString &password)
     : QObject(parent)
@@ -239,6 +240,7 @@ CardDav::CardDav(Syncer *parent,
     , m_request(new RequestGenerator(q, username, password))
     , m_parser(new ReplyParser(q, m_converter))
     , m_serverUrl(serverUrl)
+    , m_addressbookPath(addressbookPath)
     , m_downsyncRequests(0)
     , m_upsyncRequests(0)
 {
@@ -246,6 +248,7 @@ CardDav::CardDav(Syncer *parent,
 
 CardDav::CardDav(Syncer *parent,
                  const QString &serverUrl,
+                 const QString &addressbookPath,
                  const QString &accessToken)
     : QObject(parent)
     , q(parent)
@@ -253,6 +256,7 @@ CardDav::CardDav(Syncer *parent,
     , m_request(new RequestGenerator(q, accessToken))
     , m_parser(new ReplyParser(q, m_converter))
     , m_serverUrl(serverUrl)
+    , m_addressbookPath(addressbookPath)
     , m_downsyncRequests(0)
     , m_upsyncRequests(0)
 {
@@ -288,7 +292,7 @@ void CardDav::determineRemoteAMR()
 void CardDav::fetchUserInformation()
 {
     LOG_DEBUG(Q_FUNC_INFO << "requesting principal urls for user");
-    QNetworkReply *reply = m_request->currentUserInformation(m_serverUrl);
+    QNetworkReply *reply = m_request->currentUserInformation(m_serverUrl, m_addressbookPath);
     if (!reply) {
         emit error();
         return;

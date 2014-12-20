@@ -37,6 +37,8 @@
 #include <QContactManager>
 #include <QContact>
 
+#include <Accounts/Manager>
+
 QTCONTACTS_USE_NAMESPACE
 
 class Auth;
@@ -97,6 +99,8 @@ private:
     QString m_username;
     QString m_password;
     QString m_accessToken;
+    QString m_addressbookPath;
+    Accounts::Manager* mManager;
 
     // transient
     QString m_defaultAddressbook;

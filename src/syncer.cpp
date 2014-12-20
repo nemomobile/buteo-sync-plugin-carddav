@@ -58,6 +58,7 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
     , m_syncProfile(syncProfile)
     , m_cardDav(0)
     , m_auth(0)
+    , mManager(0)
 {
 }
 
@@ -111,9 +112,36 @@ void Syncer::sync(const QString &serverUrl, const QString &username, const QStri
 
 void Syncer::determineRemoteChanges(const QDateTime &, const QString &)
 {
+    if (!mManager) {
+        mManager = new Accounts::Manager(this);
+    }
+
+    Accounts::Account *account = mManager->account(m_accountId);
+    if (!account) {
+        LOG_WARNING("cannot find account" << m_accountId);
+        return;
+    }
+
+    Accounts::Service srv;
+    Q_FOREACH (const Accounts::Service &currService, account->services()) {
+        account->selectService(currService);
+        if (!account->value("addressbook_path").toString().isEmpty()) {
+            srv = currService;
+            break;
+        }
+    }
+    if (!srv.isValid()) {
+        LOG_CRITICAL("cannot find a service for account" << m_accountId << "with a valid addressbook path");
+        return;
+    }
+
+    account->selectService(srv);
+    m_addressbookPath = account->value("addressbook_path").toString();
+    LOG_DEBUG(m_syncProfile->name() << " addressbookPath " << m_addressbookPath);
+
     m_cardDav = m_username.isEmpty()
-              ? new CardDav(this, m_serverUrl, m_accessToken)
-              : new CardDav(this, m_serverUrl, m_username, m_password);
+              ? new CardDav(this, m_serverUrl, m_addressbookPath, m_accessToken)
+              : new CardDav(this, m_serverUrl, m_addressbookPath, m_username, m_password);
     connect(m_cardDav, SIGNAL(remoteChanges(QList<QContact>,QList<QContact>,QList<QContact>)),
             this, SLOT(continueSync(QList<QContact>,QList<QContact>,QList<QContact>)));
     connect(m_cardDav, SIGNAL(upsyncCompleted()),

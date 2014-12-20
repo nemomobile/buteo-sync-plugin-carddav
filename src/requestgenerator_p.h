@@ -39,7 +39,7 @@ public:
     RequestGenerator(Syncer *parent, const QString &username, const QString &password);
     RequestGenerator(Syncer *parent, const QString &accessToken);
 
-    QNetworkReply *currentUserInformation(const QString &serverUrl);
+    QNetworkReply *currentUserInformation(const QString &serverUrl, const QString &addressbookPath);
     QNetworkReply *addressbookUrls(const QString &serverUrl, const QString &userPath);
     QNetworkReply *addressbooksInformation(const QString &serverUrl, const QString &userAddressbooksPath);
     QNetworkReply *addressbookInformation(const QString &serverUrl, const QString &addressbookPath);

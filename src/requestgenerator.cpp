@@ -132,7 +132,7 @@ QNetworkReply *RequestGenerator::generateUpsyncRequest(const QString &url,
     return q->m_qnam.sendCustomRequest(req, requestType.toLatin1());
 }
 
-QNetworkReply *RequestGenerator::currentUserInformation(const QString &serverUrl)
+QNetworkReply *RequestGenerator::currentUserInformation(const QString &serverUrl, const QString &addressbookPath)
 {
     if (Q_UNLIKELY(serverUrl.isEmpty())) {
         LOG_WARNING(Q_FUNC_INFO << "server url empty, aborting");
@@ -146,7 +146,7 @@ QNetworkReply *RequestGenerator::currentUserInformation(const QString &serverUrl
           "</d:prop>"
         "</d:propfind>");
 
-    return generateRequest(serverUrl, QString(), QLatin1String("0"), QLatin1String("PROPFIND"), requestStr);
+    return generateRequest(serverUrl, addressbookPath, QLatin1String("0"), QLatin1String("PROPFIND"), requestStr);
 }
 
 QNetworkReply *RequestGenerator::addressbookUrls(const QString &serverUrl, const QString &userPath)
