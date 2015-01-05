@@ -59,9 +59,14 @@ QNetworkReply *RequestGenerator::generateRequest(const QString &url,
                                                  const QString &request) const
 {
     QByteArray requestData(request.toUtf8());
-    QUrl reqUrl = url.endsWith(path)
-                ? QUrl(url)
-                : QUrl(QStringLiteral("%1/%2").arg(url).arg(path));
+    QUrl reqUrl(url);
+    if (!path.isEmpty()) {
+        // override the path from the given url with the path argument.
+        // this is because the initial URL may be a user-principals URL
+        // but subsequent paths are not relative to that one, but instead
+        // are relative to the root path /
+        reqUrl.setPath(path);
+    }
     if (!m_username.isEmpty() && !m_password.isEmpty()) {
         reqUrl.setUserName(m_username);
         reqUrl.setPassword(m_password);
@@ -84,7 +89,7 @@ QNetworkReply *RequestGenerator::generateRequest(const QString &url,
     QBuffer *requestDataBuffer = new QBuffer(q);
     requestDataBuffer->setData(requestData);
     LOG_DEBUG("generateRequest():"
-            << m_accessToken << url << path << depth << requestType
+            << m_accessToken << reqUrl << depth << requestType
             << QString::fromUtf8(requestData));
     return q->m_qnam.sendCustomRequest(req, requestType.toLatin1(), requestDataBuffer);
 }
@@ -97,9 +102,14 @@ QNetworkReply *RequestGenerator::generateUpsyncRequest(const QString &url,
                                                        const QString &request) const
 {
     QByteArray requestData(request.toUtf8());
-    QUrl reqUrl = url.endsWith(path)
-                ? QUrl(url)
-                : QUrl(QStringLiteral("%1/%2").arg(url).arg(path));
+    QUrl reqUrl(url);
+    if (!path.isEmpty()) {
+        // override the path from the given url with the path argument.
+        // this is because the initial URL may be a user-principals URL
+        // but subsequent paths are not relative to that one, but instead
+        // are relative to the root path /
+        reqUrl.setPath(path);
+    }
     if (!m_username.isEmpty() && !m_password.isEmpty()) {
         reqUrl.setUserName(m_username);
         reqUrl.setPassword(m_password);
@@ -122,6 +132,8 @@ QNetworkReply *RequestGenerator::generateUpsyncRequest(const QString &url,
                          QString(QLatin1String("Bearer ")
                          + m_accessToken).toUtf8());
     }
+
+    LOG_DEBUG("generateUpsyncRequest():" << m_accessToken << reqUrl << ":" << requestData.length() << "bytes");
 
     if (!request.isEmpty()) {
         QBuffer *requestDataBuffer = new QBuffer(q);
