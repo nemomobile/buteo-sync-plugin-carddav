@@ -59,9 +59,12 @@ QNetworkReply *RequestGenerator::generateRequest(const QString &url,
                                                  const QString &request) const
 {
     QByteArray requestData(request.toUtf8());
-    QUrl reqUrl = url.endsWith(path)
-                ? QUrl(url)
-                : QUrl(QStringLiteral("%1/%2").arg(url).arg(path));
+    QUrl reqUrl(url);
+    if (reqUrl.path().isEmpty() || path.startsWith(reqUrl.path())) {
+        reqUrl.setPath(path);
+    } else {
+        reqUrl.setPath(QStringLiteral("%1/%2").arg(reqUrl.path()).arg(path));
+    }
     if (!m_username.isEmpty() && !m_password.isEmpty()) {
         reqUrl.setUserName(m_username);
         reqUrl.setPassword(m_password);
@@ -97,9 +100,12 @@ QNetworkReply *RequestGenerator::generateUpsyncRequest(const QString &url,
                                                        const QString &request) const
 {
     QByteArray requestData(request.toUtf8());
-    QUrl reqUrl = url.endsWith(path)
-                ? QUrl(url)
-                : QUrl(QStringLiteral("%1/%2").arg(url).arg(path));
+    QUrl reqUrl(url);
+    if (reqUrl.path().isEmpty() || path.startsWith(reqUrl.path())) {
+        reqUrl.setPath(path);
+    } else {
+        reqUrl.setPath(QStringLiteral("%1/%2").arg(reqUrl.path()).arg(path));
+    }
     if (!m_username.isEmpty() && !m_password.isEmpty()) {
         reqUrl.setUserName(m_username);
         reqUrl.setPassword(m_password);
