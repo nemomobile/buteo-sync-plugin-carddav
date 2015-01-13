@@ -70,7 +70,7 @@ Q_SIGNALS:
     void upsyncCompleted();
 
 private:
-    void fetchUserInformation();
+    void fetchUserInformation(bool firstTime);
     void fetchAddressbookUrls(const QString &userPath);
     void fetchAddressbooksInformation(const QString &addressbooksHomePath);
     void downsyncAddressbookContent(const QList<ReplyParser::AddressBookInformation> &infos);

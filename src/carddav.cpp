@@ -282,13 +282,23 @@ void CardDav::determineRemoteAMR()
     // e) fetch full contacts for delta.
 
     // We start by fetching user information.
-    fetchUserInformation();
+    fetchUserInformation(true);
 }
 
-void CardDav::fetchUserInformation()
+void CardDav::fetchUserInformation(bool firstTime)
 {
     LOG_DEBUG(Q_FUNC_INFO << "requesting principal urls for user");
-    QNetworkReply *reply = m_request->currentUserInformation(m_serverUrl);
+
+    // we need to specify the .well-known/carddav endpoint if it's the first
+    // request (so we have not yet been redirected to the correct endpoint)
+    // and if the path is empty/unknown.
+    QUrl serverUrl(m_serverUrl);
+    QString wellKnownUrl = m_serverUrl.endsWith('/')
+                         ? QStringLiteral("%1.well-known/carddav").arg(m_serverUrl)
+                         : QStringLiteral("%1/.well-known/carddav").arg(m_serverUrl);
+    QNetworkReply *reply = m_request->currentUserInformation(firstTime && serverUrl.path().isEmpty()
+                                                             ? wellKnownUrl
+                                                             : m_serverUrl);
     if (!reply) {
         emit error();
         return;
@@ -303,10 +313,32 @@ void CardDav::userInformationResponse()
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
         int httpError = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
-                   << "(" << httpError << ")");
+        LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error() << "(" << httpError << ")");
         debugDumpData(QString::fromUtf8(data));
         errorOccurred(httpError);
+        return;
+    }
+
+    // if the request was to the /.well-known/carddav path, then we need to redirect
+    QUrl redir = reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
+    if (!redir.isEmpty()) {
+        QUrl orig = reply->url();
+        if (orig.path() != redir.path()) {
+            if (orig.path().endsWith(QStringLiteral(".well-known/carddav"))) {
+                // redirect as required, and change our server URL to point to the redirect URL.
+                LOG_DEBUG(Q_FUNC_INFO << "redirecting from:" << orig.toString() << "to:" << redir.toString());
+                m_serverUrl = QStringLiteral("%1://%2%3").arg(redir.scheme()).arg(redir.host()).arg(redir.path());
+                fetchUserInformation(false); // false = no longer the first time we've performed the request.
+            } else {
+                // possibly unsafe redirect.  for security, assume it's malicious and abort sync.
+                LOG_WARNING(Q_FUNC_INFO << "unexpected redirect from:" << orig.toString() << "to:" << redir.toString());
+                errorOccurred(301);
+            }
+        } else {
+            // circular redirect, avoid the endless loop by aborting sync.
+            LOG_WARNING(Q_FUNC_INFO << "redirect specified is circular:" << redir.toString());
+            errorOccurred(301);
+        }
         return;
     }
 
