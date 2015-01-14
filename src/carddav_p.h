@@ -70,7 +70,7 @@ Q_SIGNALS:
     void upsyncCompleted();
 
 private:
-    void fetchUserInformation(bool firstTime);
+    void fetchUserInformation();
     void fetchAddressbookUrls(const QString &userPath);
     void fetchAddressbooksInformation(const QString &addressbooksHomePath);
     void downsyncAddressbookContent(const QList<ReplyParser::AddressBookInformation> &infos);
@@ -92,11 +92,19 @@ private Q_SLOTS:
 
 private:
     void contactAddModsComplete(const QString &addressbookUrl);
+
+    enum DiscoveryStage {
+        DiscoveryStarted = 0,
+        DiscoveryRedirected,
+        DiscoveryTryRoot
+    };
+
     Syncer *q;
     CardDavVCardConverter *m_converter;
     RequestGenerator *m_request;
     ReplyParser *m_parser;
     QString m_serverUrl;
+    DiscoveryStage m_discoveryStage;
 
     QList<QContact> m_remoteAdditions;
     QList<QContact> m_remoteModifications;

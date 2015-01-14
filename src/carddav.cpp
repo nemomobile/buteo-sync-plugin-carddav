@@ -239,6 +239,7 @@ CardDav::CardDav(Syncer *parent,
     , m_request(new RequestGenerator(q, username, password))
     , m_parser(new ReplyParser(q, m_converter))
     , m_serverUrl(serverUrl)
+    , m_discoveryStage(CardDav::DiscoveryStarted)
     , m_downsyncRequests(0)
     , m_upsyncRequests(0)
 {
@@ -253,6 +254,7 @@ CardDav::CardDav(Syncer *parent,
     , m_request(new RequestGenerator(q, accessToken))
     , m_parser(new ReplyParser(q, m_converter))
     , m_serverUrl(serverUrl)
+    , m_discoveryStage(CardDav::DiscoveryStarted)
     , m_downsyncRequests(0)
     , m_upsyncRequests(0)
 {
@@ -282,23 +284,47 @@ void CardDav::determineRemoteAMR()
     // e) fetch full contacts for delta.
 
     // We start by fetching user information.
-    fetchUserInformation(true);
+    fetchUserInformation();
 }
 
-void CardDav::fetchUserInformation(bool firstTime)
+void CardDav::fetchUserInformation()
 {
     LOG_DEBUG(Q_FUNC_INFO << "requesting principal urls for user");
 
     // we need to specify the .well-known/carddav endpoint if it's the first
     // request (so we have not yet been redirected to the correct endpoint)
     // and if the path is empty/unknown.
+
+    /*
+        RFC 6764 section 6.5:
+
+        * The client does a "PROPFIND" [RFC4918] request with the
+          request URI set to the initial "context path".  The body of
+          the request SHOULD include the DAV:current-user-principal
+          [RFC5397] property as one of the properties to return.  Note
+          that clients MUST properly handle HTTP redirect responses for
+          the request.  The server will use the HTTP authentication
+          procedure outlined in [RFC2617] or use some other appropriate
+          authentication schemes to authenticate the user.
+
+        * When an initial "context path" has not been determined from a
+          TXT record, the initial "context path" is taken to be
+          "/.well-known/caldav" (for CalDAV) or "/.well-known/carddav"
+          (for CardDAV).
+
+        * If the server returns a 404 ("Not Found") HTTP status response
+          to the request on the initial "context path", clients MAY try
+          repeating the request on the "root" URI "/" or prompt the user
+          for a suitable path.
+    */
+
     QUrl serverUrl(m_serverUrl);
-    QString wellKnownUrl = m_serverUrl.endsWith('/')
-                         ? QStringLiteral("%1.well-known/carddav").arg(m_serverUrl)
-                         : QStringLiteral("%1/.well-known/carddav").arg(m_serverUrl);
-    QNetworkReply *reply = m_request->currentUserInformation(firstTime && serverUrl.path().isEmpty()
-                                                             ? wellKnownUrl
-                                                             : m_serverUrl);
+    QString wellKnownUrl = QStringLiteral("%1://%2/.well-known/carddav").arg(serverUrl.scheme()).arg(serverUrl.host());
+    bool firstRequest = m_discoveryStage == CardDav::DiscoveryStarted;
+    m_serverUrl = firstRequest && (serverUrl.path().isEmpty() || serverUrl.path() == QStringLiteral("/"))
+                ? wellKnownUrl
+                : m_serverUrl;
+    QNetworkReply *reply = m_request->currentUserInformation(m_serverUrl);
     if (!reply) {
         emit error();
         return;
@@ -313,8 +339,30 @@ void CardDav::userInformationResponse()
     QByteArray data = reply->readAll();
     if (reply->error() != QNetworkReply::NoError) {
         int httpError = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error() << "(" << httpError << ")");
+        LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error() << "(" << httpError << ") to request" << m_serverUrl);
         debugDumpData(QString::fromUtf8(data));
+        QUrl oldServerUrl(m_serverUrl);
+        if (m_discoveryStage == CardDav::DiscoveryStarted && (httpError == 404 || httpError == 405)) {
+            if (!oldServerUrl.path().endsWith(QStringLiteral(".well-known/carddav"))) {
+                // From RFC 6764: If the initial "context path" derived from a TXT record
+                // generates HTTP errors when targeted by requests, the client
+                // SHOULD repeat its "bootstrapping" procedure using the
+                // appropriate ".well-known" URI instead.
+                LOG_DEBUG(Q_FUNC_INFO << "got HTTP response" << httpError << "to initial discovery request; trying well-known URI");
+                m_serverUrl = QStringLiteral("%1://%2/.well-known/carddav").arg(oldServerUrl.scheme()).arg(oldServerUrl.host());
+                fetchUserInformation(); // set initial context path to well-known URI.
+            } else {
+                // From RFC 6764: if the server returns a 404 HTTP status response to the
+                // request on the initial context path, clients may try repeating the request
+                // on the root URI.
+                // We also do this on HTTP 405 in case some implementation is non-spec-conformant.
+                LOG_DEBUG(Q_FUNC_INFO << "got HTTP response" << httpError << "to well-known request; trying root URI");
+                m_discoveryStage = CardDav::DiscoveryTryRoot;
+                m_serverUrl = QStringLiteral("%1://%2/").arg(oldServerUrl.scheme()).arg(oldServerUrl.host());
+                fetchUserInformation();
+            }
+            return;
+        }
         errorOccurred(httpError);
         return;
     }
@@ -328,7 +376,8 @@ void CardDav::userInformationResponse()
                 // redirect as required, and change our server URL to point to the redirect URL.
                 LOG_DEBUG(Q_FUNC_INFO << "redirecting from:" << orig.toString() << "to:" << redir.toString());
                 m_serverUrl = QStringLiteral("%1://%2%3").arg(redir.scheme()).arg(redir.host()).arg(redir.path());
-                fetchUserInformation(false); // false = no longer the first time we've performed the request.
+                m_discoveryStage = CardDav::DiscoveryRedirected;
+                fetchUserInformation();
             } else {
                 // possibly unsafe redirect.  for security, assume it's malicious and abort sync.
                 LOG_WARNING(Q_FUNC_INFO << "unexpected redirect from:" << orig.toString() << "to:" << redir.toString());
