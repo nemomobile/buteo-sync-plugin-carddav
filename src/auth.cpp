@@ -59,7 +59,7 @@ Auth::~Auth()
 
 void Auth::signIn(int accountId)
 {
-    m_account = m_manager.account(accountId);
+    m_account = Accounts::Account::fromId(&m_manager, accountId, this);
     if (!m_account) {
         LOG_WARNING(Q_FUNC_INFO << "unable to load account" << accountId);
         emit signInError();
