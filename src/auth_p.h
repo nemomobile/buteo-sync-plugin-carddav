@@ -43,7 +43,7 @@ public:
     void setCredentialsNeedUpdate(int accountId);
 
 Q_SIGNALS:
-    void signInCompleted(const QString &serverUrl, const QString &username, const QString &password, const QString &accessToken);
+    void signInCompleted(const QString &serverUrl, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors);
     void signInError();
 
 private Q_SLOTS:
@@ -56,6 +56,7 @@ private:
     SignOn::Identity *m_ident;
     SignOn::AuthSession *m_session;
     QString m_serverUrl;
+    bool m_ignoreSslErrors;
 };
 
 

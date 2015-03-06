@@ -58,6 +58,7 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
     , m_syncProfile(syncProfile)
     , m_cardDav(0)
     , m_auth(0)
+    , m_ignoreSslErrors(false)
 {
 }
 
@@ -77,8 +78,8 @@ void Syncer::startSync(int accountId)
     Q_ASSERT(accountId != 0);
     m_accountId = accountId;
     m_auth = new Auth(this);
-    connect(m_auth, SIGNAL(signInCompleted(QString,QString,QString,QString)),
-            this, SLOT(sync(QString,QString,QString,QString)));
+    connect(m_auth, SIGNAL(signInCompleted(QString,QString,QString,QString,bool)),
+            this, SLOT(sync(QString,QString,QString,QString,bool)));
     connect(m_auth, SIGNAL(signInError()),
             this, SLOT(signInError()));
     LOG_DEBUG(Q_FUNC_INFO << "starting carddav sync with account" << m_accountId);
@@ -90,12 +91,13 @@ void Syncer::signInError()
     emit syncFailed();
 }
 
-void Syncer::sync(const QString &serverUrl, const QString &username, const QString &password, const QString &accessToken)
+void Syncer::sync(const QString &serverUrl, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors)
 {
     m_serverUrl = serverUrl;
     m_username = username;
     m_password = password;
     m_accessToken = accessToken;
+    m_ignoreSslErrors = ignoreSslErrors;
 
     QDateTime remoteSince;
     if (!initSyncAdapter(QString::number(m_accountId))

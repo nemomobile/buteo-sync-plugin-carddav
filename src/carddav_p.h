@@ -32,6 +32,7 @@
 #include <QMap>
 #include <QString>
 #include <QSet>
+#include <QSslError>
 
 #include <QContact>
 #include <QVersitContactImporterPropertyHandlerV2>
@@ -79,6 +80,7 @@ private:
     void fetchContacts(const QString &addressbookUrl, const QList<ReplyParser::ContactInformation> &amrInfo);
 
 private Q_SLOTS:
+    void sslErrorsOccurred(const QList<QSslError> &errors);
     void userInformationResponse();
     void addressbookUrlsResponse();
     void addressbooksInformationResponse();

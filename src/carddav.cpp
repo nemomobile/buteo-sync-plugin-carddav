@@ -330,7 +330,20 @@ void CardDav::fetchUserInformation()
         return;
     }
 
+    connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsOccurred(QList<QSslError>)));
     connect(reply, SIGNAL(finished()), this, SLOT(userInformationResponse()));
+}
+
+void CardDav::sslErrorsOccurred(const QList<QSslError> &errors)
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    if (q->m_ignoreSslErrors) {
+        LOG_DEBUG(Q_FUNC_INFO << "ignoring SSL errors due to account policy:" << errors);
+        reply->ignoreSslErrors(errors);
+    } else {
+        LOG_WARNING(Q_FUNC_INFO << "SSL errors occurred, aborting:" << errors);
+        errorOccurred(401);
+    }
 }
 
 void CardDav::userInformationResponse()
@@ -426,6 +439,7 @@ void CardDav::fetchAddressbookUrls(const QString &userPath)
         return;
     }
 
+    connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsOccurred(QList<QSslError>)));
     connect(reply, SIGNAL(finished()), this, SLOT(addressbookUrlsResponse()));
 }
 
@@ -461,6 +475,7 @@ void CardDav::fetchAddressbooksInformation(const QString &addressbooksHomePath)
         return;
     }
 
+    connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsOccurred(QList<QSslError>)));
     connect(reply, SIGNAL(finished()), this, SLOT(addressbooksInformationResponse()));
 }
 
@@ -561,6 +576,7 @@ void CardDav::fetchImmediateDelta(const QString &addressbookUrl, const QString &
 
     m_downsyncRequests += 1; // when this reaches zero, we've finished all addressbook deltas
     reply->setProperty("addressbookUrl", addressbookUrl);
+    connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsOccurred(QList<QSslError>)));
     connect(reply, SIGNAL(finished()), this, SLOT(immediateDeltaResponse()));
 }
 
@@ -596,6 +612,7 @@ void CardDav::fetchContactMetadata(const QString &addressbookUrl)
 
     m_downsyncRequests += 1; // when this reaches zero, we've finished all addressbook deltas
     reply->setProperty("addressbookUrl", addressbookUrl);
+    connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsOccurred(QList<QSslError>)));
     connect(reply, SIGNAL(finished()), this, SLOT(contactMetadataResponse()));
 }
 
@@ -659,6 +676,7 @@ void CardDav::fetchContacts(const QString &addressbookUrl, const QList<ReplyPars
         }
 
         reply->setProperty("addressbookUrl", addressbookUrl);
+        connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsOccurred(QList<QSslError>)));
         connect(reply, SIGNAL(finished()), this, SLOT(contactsResponse()));
     }
 }
@@ -823,6 +841,7 @@ void CardDav::upsyncUpdates(const QString &addressbookUrl, const QList<QContact>
             m_upsyncRequests += 1;
             reply->setProperty("addressbookUrl", addressbookUrl);
             reply->setProperty("contactGuid", guid);
+            connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsOccurred(QList<QSslError>)));
             connect(reply, SIGNAL(finished()), this, SLOT(upsyncResponse()));
         }
 
@@ -857,6 +876,7 @@ void CardDav::upsyncUpdates(const QString &addressbookUrl, const QList<QContact>
             m_upsyncRequests += 1;
             reply->setProperty("addressbookUrl", addressbookUrl);
             reply->setProperty("contactGuid", guidstr);
+            connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsOccurred(QList<QSslError>)));
             connect(reply, SIGNAL(finished()), this, SLOT(upsyncResponse()));
         }
 
@@ -880,6 +900,7 @@ void CardDav::upsyncUpdates(const QString &addressbookUrl, const QList<QContact>
 
             m_upsyncRequests += 1;
             reply->setProperty("addressbookUrl", addressbookUrl);
+            connect(reply, SIGNAL(sslErrors(QList<QSslError>)), this, SLOT(sslErrorsOccurred(QList<QSslError>)));
             connect(reply, SIGNAL(finished()), this, SLOT(upsyncResponse()));
         }
     }

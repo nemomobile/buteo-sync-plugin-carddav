@@ -75,7 +75,7 @@ private:
     bool storeExtraStateData(int accountId);
 
 private Q_SLOTS:
-    void sync(const QString &serverUrl, const QString &username, const QString &password, const QString &accessToken);
+    void sync(const QString &serverUrl, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors);
     void continueSync(const QList<QContact> &added, const QList<QContact> &modified, const QList<QContact> &removed);
     void syncFinished();
     void signInError();
@@ -97,6 +97,7 @@ private:
     QString m_username;
     QString m_password;
     QString m_accessToken;
+    bool m_ignoreSslErrors;
 
     // transient
     QString m_defaultAddressbook;
