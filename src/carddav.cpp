@@ -33,6 +33,7 @@
 
 #include <QContact>
 #include <QContactGuid>
+#include <QContactAvatar>
 
 #include <QVersitWriter>
 #include <QVersitDocument>
@@ -40,6 +41,8 @@
 #include <QVersitContactExporter>
 #include <QVersitReader>
 #include <QVersitContactImporter>
+
+#include <seasidepropertyhandler.h>
 
 namespace {
     void debugDumpData(const QString &data)
@@ -82,7 +85,7 @@ QStringList CardDavVCardConverter::supportedPropertyNames()
     QStringList supportedProperties;
     supportedProperties << "VERSION" << "PRODID" << "REV"
                         << "N" << "FN" << "NICKNAME" << "BDAY" << "X-GENDER"
-                        << "EMAIL" << "TEL" << "ADR" << "URL"
+                        << "EMAIL" << "TEL" << "ADR" << "URL" << "PHOTO"
                         << "ORG" << "TITLE" << "ROLE"
                         << "UID";
     return supportedProperties;
@@ -183,7 +186,16 @@ void CardDavVCardConverter::propertyProcessed(const QVersitDocument &, const QVe
 {
     static QStringList supportedProperties(supportedPropertyNames());
     const QString propertyName(property.name().toUpper());
-    if (supportedProperties.contains(propertyName)) {
+    if (propertyName == QLatin1String("PHOTO")) {
+        // use the standard PHOTO handler from Seaside libcontacts
+        QContactAvatar newAvatar = SeasidePropertyHandler::avatarFromPhotoProperty(property);
+        if (!newAvatar.isEmpty()) {
+            updatedDetails->append(newAvatar);
+        }
+        // don't let the default PHOTO handler import it, even if we failed above.
+        *alreadyProcessed = true;
+        return;
+    } else if (supportedProperties.contains(propertyName)) {
         // do nothing, let the default handler import them.
         *alreadyProcessed = true;
         return;
