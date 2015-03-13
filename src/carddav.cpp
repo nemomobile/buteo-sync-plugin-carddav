@@ -123,6 +123,12 @@ QPair<QContact, QStringList> CardDavVCardConverter::convertVCardToContact(const 
     QStringList unsupportedProperties = m_unsupportedProperties.value(importedContact.detail<QContactGuid>().guid());
     m_unsupportedProperties.clear();
 
+    // mark each detail of the contact as modifiable
+    Q_FOREACH (QContactDetail det, importedContact.details()) {
+        det.setValue(QContactDetail__FieldModifiable, true);
+        importedContact.saveDetail(&det);
+    }
+
     *ok = true;
     return qMakePair(importedContact, unsupportedProperties);
 }
