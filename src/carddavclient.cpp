@@ -59,6 +59,10 @@ void CardDavClient::connectivityStateChanged(Sync::ConnectivityType aType, bool 
 {
     FUNCTION_CALL_TRACE;
     LOG_DEBUG("Received connectivity change event:" << aType << " changed to " << aState);
+    if (aType == Sync::CONNECTIVITY_INTERNET && !aState) {
+        // we lost connectivity during sync.
+        abortSync(Sync::SYNC_CONNECTION_ERROR);
+    }
 }
 
 bool CardDavClient::init()
@@ -120,6 +124,7 @@ void CardDavClient::abortSync(Sync::SyncStatus aStatus)
 void CardDavClient::abort(Sync::SyncStatus status)
 {
     FUNCTION_CALL_TRACE;
+    m_syncer->abortSync();
     syncFinished(status, QStringLiteral("Sync aborted"));
 }
 

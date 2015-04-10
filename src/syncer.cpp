@@ -58,6 +58,8 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
     , m_syncProfile(syncProfile)
     , m_cardDav(0)
     , m_auth(0)
+    , m_syncAborted(false)
+    , m_accountId(0)
     , m_ignoreSslErrors(false)
 {
 }
@@ -71,6 +73,11 @@ Syncer::~Syncer()
 bool Syncer::testAccountProvenance(const QContact &contact, const QString &accountId)
 {
     return contact.detail<QContactGuid>().guid().startsWith(QStringLiteral("%1:").arg(accountId));
+}
+
+void Syncer::abortSync()
+{
+    m_syncAborted = true;
 }
 
 void Syncer::startSync(int accountId)
@@ -136,6 +143,12 @@ void Syncer::cardDavError(int errorCode)
 
 void Syncer::continueSync(const QList<QContact> &added, const QList<QContact> &modified, const QList<QContact> &removed)
 {
+    if (m_syncAborted) {
+        LOG_WARNING(Q_FUNC_INFO << "sync aborted");
+        cardDavError();
+        return;
+    }
+
     // store the remote changes locally
     QList<QContact> addMod = added+modified, del = removed;
     LOG_DEBUG(Q_FUNC_INFO << "storing remote changes to local device: AMR:"

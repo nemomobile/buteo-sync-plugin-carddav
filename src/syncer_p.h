@@ -54,6 +54,7 @@ public:
 
     void startSync(int accountId);
     void purgeAccount(int accountId);
+    void abortSync();
 
 Q_SIGNALS:
     void syncSucceeded();
@@ -90,6 +91,7 @@ private:
     Auth *m_auth;
     QContactManager m_contactManager;
     QNetworkAccessManager m_qnam;
+    bool m_syncAborted;
 
     // auth related
     int m_accountId;
