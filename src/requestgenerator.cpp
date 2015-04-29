@@ -134,6 +134,9 @@ QNetworkReply *RequestGenerator::generateUpsyncRequest(const QString &url,
     }
 
     LOG_DEBUG("generateUpsyncRequest():" << m_accessToken << reqUrl << ":" << requestData.length() << "bytes");
+    Q_FOREACH (const QByteArray &headerName, req.rawHeaderList()) {
+        LOG_DEBUG("   " << headerName << "=" << req.rawHeader(headerName));
+    }
 
     if (!request.isEmpty()) {
         QBuffer *requestDataBuffer = new QBuffer(q);

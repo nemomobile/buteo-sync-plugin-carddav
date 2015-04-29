@@ -74,6 +74,7 @@ protected:
 private:
     bool readExtraStateData(int accountId);
     bool storeExtraStateData(int accountId);
+    bool purgeExtraStateData(int accountId);
 
 private Q_SLOTS:
     void sync(const QString &serverUrl, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors);
@@ -92,6 +93,7 @@ private:
     QContactManager m_contactManager;
     QNetworkAccessManager m_qnam;
     bool m_syncAborted;
+    bool m_syncError;
 
     // auth related
     int m_accountId;
