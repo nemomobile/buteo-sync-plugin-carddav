@@ -952,7 +952,13 @@ void CardDav::upsyncResponse()
         }
 
         if (!etag.isEmpty()) {
+            LOG_DEBUG("Got updated etag for" << guid << ":" << etag);
             q->m_contactEtags[guid] = etag;
+        } else {
+            // If we don't perform an additional request, the etag server-side will be different to the etag
+            // we have locally, and thus on next sync we would spuriously detect a server-side modification.
+            // That's ok, we'll just detect that it's spurious via data inspection during the next sync.
+            LOG_WARNING("No updated etag provided for" << guid << ": will be reported as spurious remote modification next sync");
         }
     }
 

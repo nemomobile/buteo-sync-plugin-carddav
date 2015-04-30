@@ -440,12 +440,18 @@ QList<ReplyParser::ContactInformation> ReplyParser::parseContactMetadata(const Q
             currInfo.modType = currInfo.guid.isEmpty()
                              ? ReplyParser::ContactInformation::Addition
                              : ReplyParser::ContactInformation::Modification;
-            if (currInfo.modType == ReplyParser::ContactInformation::Addition
-                    || q->m_contactEtags[currInfo.guid] != currInfo.etag) {
-                // only append if it's an addition or an actual modification
-                // the etag will have changed since the last time we saw it,
-                // if the contact has been modified server-side since last sync.
+            // only append if it's an addition or an actual modification
+            // the etag will have changed since the last time we saw it,
+            // if the contact has been modified server-side since last sync.
+            if (currInfo.modType == ReplyParser::ContactInformation::Addition) {
+                LOG_TRACE("Resource" << currInfo.uri << "was added on server with etag" << currInfo.etag);
                 info.append(currInfo);
+            } else if (q->m_contactEtags[currInfo.guid] != currInfo.etag) {
+                LOG_TRACE("Resource" << currInfo.uri << "with guid" << currInfo.guid << "was modified on server.");
+                LOG_TRACE("Old etag:" << q->m_contactEtags[currInfo.guid] << "New etag:" << currInfo.etag);
+                info.append(currInfo);
+            } else {
+                LOG_TRACE("Resource" << currInfo.uri << "with guid" << currInfo.guid << "is unchanged since last sync with etag" << currInfo.etag);
             }
         } else {
             LOG_WARNING(Q_FUNC_INFO << "unknown response:" << currInfo.uri << currInfo.etag << status);
@@ -458,6 +464,7 @@ QList<ReplyParser::ContactInformation> ReplyParser::parseContactMetadata(const Q
         const QString &uri(q->m_contactUris[guid]);
         if (!seenUris.contains(uri)) {
             // this uri wasn't listed in the report, so this contact must have been deleted.
+            LOG_TRACE("Resource" << uri << "with guid" << guid << "was deleted on server");
             ReplyParser::ContactInformation currInfo;
             currInfo.etag = q->m_contactEtags[guid];
             currInfo.uri = uri;

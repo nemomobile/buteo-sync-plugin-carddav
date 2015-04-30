@@ -169,7 +169,18 @@ void Syncer::continueSync(const QList<QContact> &added, const QList<QContact> &m
     // continue with the upsync half of the sync process.
     QDateTime localSince;
     QList<QContact> locallyAdded, locallyModified, locallyDeleted;
-    if (!determineLocalChanges(&localSince, &locallyAdded, &locallyModified, &locallyDeleted, QString::number(m_accountId))) {
+    // Note: we may still upsync these ignorable details+fields, just don't look at them during delta detection.
+    // We need to do this, otherwise there can be infinite loops caused due to spurious differences between the
+    // in-memory version (QContact) and the exportable version (vCard) resulting in ETag updates server-side.
+    // The downside is that changes to these details will not be upsynced unless another change also occurs.
+    QSet<QContactDetail::DetailType> ignorableDetailTypes = getDefaultIgnorableDetailTypes();
+    ignorableDetailTypes.insert(QContactDetail::TypeFavorite); // ignore differences in X-FAVORITE field when detecting delta.
+    ignorableDetailTypes.insert(QContactDetail::TypeAvatar);   // ignore differences in PHOTO field when detecting delta.
+    QHash<QContactDetail::DetailType, QSet<int> > ignorableDetailFields = getDefaultIgnorableDetailFields();
+    ignorableDetailFields[QContactDetail::TypePhoneNumber] << QContactPhoneNumber::FieldSubTypes; // and TEL number subtypes
+    ignorableDetailFields[QContactDetail::TypeUrl] << QContactUrl::FieldSubType;                  // and URL subtype
+    if (!determineLocalChanges(&localSince, &locallyAdded, &locallyModified, &locallyDeleted,
+                               QString::number(m_accountId), ignorableDetailTypes, ignorableDetailFields)) {
         LOG_WARNING(Q_FUNC_INFO << "unable to determine local changes for account" << m_accountId);
         cardDavError();
         return;
