@@ -83,10 +83,11 @@ void Auth::signIn(int accountId)
         return;
     }
 
-    // determine the remote server URL from the account settings, and then sign in.
+    // determine the remote URL from the account settings, and then sign in.
     m_account->selectService(srv);
     m_ignoreSslErrors = m_account->value("ignore_ssl_errors").toBool();
     m_serverUrl = m_account->value("server_address").toString();
+    m_addressbookPath = m_account->value("addressbook_path").toString(); // optional, may be empty.
     if (m_serverUrl.isEmpty()) {
         LOG_WARNING(Q_FUNC_INFO << "no valid server url setting in account" << accountId);
         emit signInError();
@@ -153,9 +154,9 @@ void Auth::signOnResponse(const SignOn::SessionData &response)
 
     // we need both username+password, OR accessToken.
     if (!accessToken.isEmpty()) {
-        emit signInCompleted(m_serverUrl, QString(), QString(), accessToken, m_ignoreSslErrors);
+        emit signInCompleted(m_serverUrl, m_addressbookPath, QString(), QString(), accessToken, m_ignoreSslErrors);
     } else if (!username.isEmpty() && !password.isEmpty()) {
-        emit signInCompleted(m_serverUrl, username, password, QString(), m_ignoreSslErrors);
+        emit signInCompleted(m_serverUrl, m_addressbookPath, username, password, QString(), m_ignoreSslErrors);
     } else {
         LOG_WARNING(Q_FUNC_INFO << "authentication succeeded, but couldn't find valid credentials");
         emit signInError();

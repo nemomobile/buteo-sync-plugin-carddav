@@ -86,8 +86,8 @@ void Syncer::startSync(int accountId)
     Q_ASSERT(accountId != 0);
     m_accountId = accountId;
     m_auth = new Auth(this);
-    connect(m_auth, SIGNAL(signInCompleted(QString,QString,QString,QString,bool)),
-            this, SLOT(sync(QString,QString,QString,QString,bool)));
+    connect(m_auth, SIGNAL(signInCompleted(QString,QString,QString,QString,QString,bool)),
+            this, SLOT(sync(QString,QString,QString,QString,QString,bool)));
     connect(m_auth, SIGNAL(signInError()),
             this, SLOT(signInError()));
     LOG_DEBUG(Q_FUNC_INFO << "starting carddav sync with account" << m_accountId);
@@ -99,9 +99,10 @@ void Syncer::signInError()
     emit syncFailed();
 }
 
-void Syncer::sync(const QString &serverUrl, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors)
+void Syncer::sync(const QString &serverUrl, const QString &addressbookPath, const QString &username, const QString &password, const QString &accessToken, bool ignoreSslErrors)
 {
     m_serverUrl = serverUrl;
+    m_addressbookPath = addressbookPath;
     m_username = username;
     m_password = password;
     m_accessToken = accessToken;
@@ -123,8 +124,8 @@ void Syncer::sync(const QString &serverUrl, const QString &username, const QStri
 void Syncer::determineRemoteChanges(const QDateTime &, const QString &)
 {
     m_cardDav = m_username.isEmpty()
-              ? new CardDav(this, m_serverUrl, m_accessToken)
-              : new CardDav(this, m_serverUrl, m_username, m_password);
+              ? new CardDav(this, m_serverUrl, m_addressbookPath, m_accessToken)
+              : new CardDav(this, m_serverUrl, m_addressbookPath, m_username, m_password);
     connect(m_cardDav, SIGNAL(remoteChanges(QList<QContact>,QList<QContact>,QList<QContact>)),
             this, SLOT(continueSync(QList<QContact>,QList<QContact>,QList<QContact>)));
     connect(m_cardDav, SIGNAL(upsyncCompleted()),
