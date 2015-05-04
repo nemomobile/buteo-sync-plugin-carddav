@@ -251,6 +251,7 @@ void CardDavVCardConverter::detailProcessed(const QContact &, const QContactDeta
 
 CardDav::CardDav(Syncer *parent,
                  const QString &serverUrl,
+                 const QString &addressbookPath,
                  const QString &username,
                  const QString &password)
     : QObject(parent)
@@ -259,6 +260,7 @@ CardDav::CardDav(Syncer *parent,
     , m_request(new RequestGenerator(q, username, password))
     , m_parser(new ReplyParser(q, m_converter))
     , m_serverUrl(serverUrl)
+    , m_addressbookPath(addressbookPath)
     , m_discoveryStage(CardDav::DiscoveryStarted)
     , m_downsyncRequests(0)
     , m_upsyncRequests(0)
@@ -267,6 +269,7 @@ CardDav::CardDav(Syncer *parent,
 
 CardDav::CardDav(Syncer *parent,
                  const QString &serverUrl,
+                 const QString &addressbookPath,
                  const QString &accessToken)
     : QObject(parent)
     , q(parent)
@@ -274,6 +277,7 @@ CardDav::CardDav(Syncer *parent,
     , m_request(new RequestGenerator(q, accessToken))
     , m_parser(new ReplyParser(q, m_converter))
     , m_serverUrl(serverUrl)
+    , m_addressbookPath(addressbookPath)
     , m_discoveryStage(CardDav::DiscoveryStarted)
     , m_downsyncRequests(0)
     , m_upsyncRequests(0)
@@ -294,17 +298,22 @@ void CardDav::errorOccurred(int httpError)
 
 void CardDav::determineRemoteAMR()
 {
-    // The CardDAV sequence for determining the A/M/R delta is:
-    // a)  fetch user information from the principal URL
-    // b)  fetch addressbooks home url
-    // c)  fetch addressbook information
-    // d)  for each addressbook, either:
-    //     i)  perform immediate delta sync (if webdav-sync enabled) OR
-    //     ii) fetch etags, manually calculate delta
-    // e) fetch full contacts for delta.
+    if (m_addressbookPath.isEmpty()) {
+        // The CardDAV sequence for determining the A/M/R delta is:
+        // a)  fetch user information from the principal URL
+        // b)  fetch addressbooks home url
+        // c)  fetch addressbook information
+        // d)  for each addressbook, either:
+        //     i)  perform immediate delta sync (if webdav-sync enabled) OR
+        //     ii) fetch etags, manually calculate delta
+        // e) fetch full contacts for delta.
 
-    // We start by fetching user information.
-    fetchUserInformation();
+        // We start by fetching user information.
+        fetchUserInformation();
+    } else {
+        // we can skip to step (c) of the discovery.
+        fetchAddressbooksInformation(m_addressbookPath);
+    }
 }
 
 void CardDav::fetchUserInformation()

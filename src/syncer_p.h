@@ -98,6 +98,7 @@ private:
     // auth related
     int m_accountId;
     QString m_serverUrl;
+    QString m_addressbookPath;
     QString m_username;
     QString m_password;
     QString m_accessToken;

@@ -50,10 +50,12 @@ class CardDav : public QObject
 public:
     CardDav(Syncer *parent,
             const QString &serverUrl,
+            const QString &addressbookPath,
             const QString &username,
             const QString &password);
     CardDav(Syncer *parent,
             const QString &serverUrl,
+            const QString &addressbookPath,
             const QString &accessToken);
     ~CardDav();
 
@@ -106,6 +108,7 @@ private:
     RequestGenerator *m_request;
     ReplyParser *m_parser;
     QString m_serverUrl;
+    QString m_addressbookPath;
     DiscoveryStage m_discoveryStage;
 
     QList<QContact> m_remoteAdditions;
