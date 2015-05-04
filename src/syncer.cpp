@@ -59,6 +59,7 @@ Syncer::Syncer(QObject *parent, Buteo::SyncProfile *syncProfile)
     , m_cardDav(0)
     , m_auth(0)
     , m_syncAborted(false)
+    , m_syncError(false)
     , m_accountId(0)
     , m_ignoreSslErrors(false)
 {
@@ -115,6 +116,7 @@ void Syncer::sync(const QString &serverUrl, const QString &username, const QStri
         return;
     }
 
+    LOG_DEBUG("Sync adapter initialised, determining remote changes since" << remoteSince.toString(Qt::ISODate) << "for account" << m_accountId);
     determineRemoteChanges(remoteSince, QString::number(m_accountId));
 }
 
@@ -132,19 +134,10 @@ void Syncer::determineRemoteChanges(const QDateTime &, const QString &)
     m_cardDav->determineRemoteAMR();
 }
 
-void Syncer::cardDavError(int errorCode)
-{
-    if (errorCode == HTTP_UNAUTHORIZED_ACCESS) {
-        m_auth->setCredentialsNeedUpdate(m_accountId);
-    }
-    purgeSyncStateData(QString::number(m_accountId));   
-    emit syncFailed();
-}
-
 void Syncer::continueSync(const QList<QContact> &added, const QList<QContact> &modified, const QList<QContact> &removed)
 {
-    if (m_syncAborted) {
-        LOG_WARNING(Q_FUNC_INFO << "sync aborted");
+    if (m_syncAborted || m_syncError) {
+        LOG_WARNING(Q_FUNC_INFO << "sync error or aborted");
         cardDavError();
         return;
     }
@@ -176,7 +169,18 @@ void Syncer::continueSync(const QList<QContact> &added, const QList<QContact> &m
     // continue with the upsync half of the sync process.
     QDateTime localSince;
     QList<QContact> locallyAdded, locallyModified, locallyDeleted;
-    if (!determineLocalChanges(&localSince, &locallyAdded, &locallyModified, &locallyDeleted, QString::number(m_accountId))) {
+    // Note: we may still upsync these ignorable details+fields, just don't look at them during delta detection.
+    // We need to do this, otherwise there can be infinite loops caused due to spurious differences between the
+    // in-memory version (QContact) and the exportable version (vCard) resulting in ETag updates server-side.
+    // The downside is that changes to these details will not be upsynced unless another change also occurs.
+    QSet<QContactDetail::DetailType> ignorableDetailTypes = getDefaultIgnorableDetailTypes();
+    ignorableDetailTypes.insert(QContactDetail::TypeFavorite); // ignore differences in X-FAVORITE field when detecting delta.
+    ignorableDetailTypes.insert(QContactDetail::TypeAvatar);   // ignore differences in PHOTO field when detecting delta.
+    QHash<QContactDetail::DetailType, QSet<int> > ignorableDetailFields = getDefaultIgnorableDetailFields();
+    ignorableDetailFields[QContactDetail::TypePhoneNumber] << QContactPhoneNumber::FieldSubTypes; // and TEL number subtypes
+    ignorableDetailFields[QContactDetail::TypeUrl] << QContactUrl::FieldSubType;                  // and URL subtype
+    if (!determineLocalChanges(&localSince, &locallyAdded, &locallyModified, &locallyDeleted,
+                               QString::number(m_accountId), ignorableDetailTypes, ignorableDetailFields)) {
         LOG_WARNING(Q_FUNC_INFO << "unable to determine local changes for account" << m_accountId);
         cardDavError();
         return;
@@ -190,7 +194,7 @@ void Syncer::continueSync(const QList<QContact> &added, const QList<QContact> &m
     }
 }
 
-void Syncer::upsyncLocalChanges(const QDateTime &,
+void Syncer::upsyncLocalChanges(const QDateTime &localSince,
                                 const QList<QContact> &locallyAdded,
                                 const QList<QContact> &locallyModified,
                                 const QList<QContact> &locallyDeleted,
@@ -198,7 +202,7 @@ void Syncer::upsyncLocalChanges(const QDateTime &,
 {
     LOG_DEBUG(Q_FUNC_INFO << "upsyncing local changes to remote server: AMR:"
              << locallyAdded.count() << locallyModified.count() << locallyDeleted.count()
-             << "for account:" << m_accountId);
+             << "for account:" << m_accountId << "since:" << localSince);
 
     // segment the changes according to the addressbook the contacts are from
     QSet<QString> modifiedAddressbookUrls;
@@ -261,16 +265,29 @@ void Syncer::upsyncLocalChanges(const QDateTime &,
 void Syncer::syncFinished()
 {
     // finished upsync.  Just need to store our state data and we're done.
+    LOG_DEBUG(Q_FUNC_INFO << "about to store sync state data");
     if (!storeExtraStateData(m_accountId) || !storeSyncStateData(QString::number(m_accountId))) {
         LOG_WARNING(Q_FUNC_INFO << "unable to finalise sync state");
         cardDavError(); // actually in this case we have already stored stuff to local and server...?
         return;
     }
 
-    LOG_DEBUG(Q_FUNC_INFO << "carddav sync with account" << m_accountId << "finished successfully!");
-
     // Success.
+    LOG_DEBUG(Q_FUNC_INFO << "carddav sync with account" << m_accountId << "finished successfully!");
     emit syncSucceeded();
+}
+
+void Syncer::cardDavError(int errorCode)
+{
+    LOG_WARNING("CardDAV sync finished with error:" << errorCode <<
+                "purging state data for account:" << m_accountId);
+    m_syncError = true;
+    if (errorCode == HTTP_UNAUTHORIZED_ACCESS) {
+        m_auth->setCredentialsNeedUpdate(m_accountId);
+    }
+    purgeExtraStateData(m_accountId);
+    purgeSyncStateData(QString::number(m_accountId));
+    emit syncFailed();
 }
 
 void Syncer::purgeAccount(int accountId)
@@ -567,5 +584,20 @@ bool Syncer::storeExtraStateData(int accountId)
         return false;
     }
 
+    return true;
+}
+
+// this function must be called directly before purgeSyncStateData()
+bool Syncer::purgeExtraStateData(int accountId)
+{
+    QStringList purgeKeys;
+    purgeKeys << QStringLiteral("addressbookContactGuids") << QStringLiteral("addressbookCtags");
+    purgeKeys << QStringLiteral("addressbookSyncTokens") << QStringLiteral("contactUids");
+    purgeKeys << QStringLiteral("contactUris") << QStringLiteral("contactEtags");
+    purgeKeys << QStringLiteral("contactIds") << QStringLiteral("contactUnsupportedProperties");
+    if (!d->m_engine->removeOOB(d->m_stateData[QString::number(accountId)].m_oobScope, purgeKeys)) {
+        LOG_WARNING(Q_FUNC_INFO << "failed to remove extra state data for carddav account" << accountId);
+        return false;
+    }
     return true;
 }
