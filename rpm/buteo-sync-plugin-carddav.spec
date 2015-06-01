@@ -1,7 +1,7 @@
 Name:       buteo-sync-plugin-carddav
 Summary:    Syncs contact data from CardDAV services
 Version:    0.0.15
-Release:    2
+Release:    3
 Group:      System/Libraries
 License:    LGPLv2.1
 URL:        https://github.com/nemomobile/buteo-sync-plugin-carddav
