@@ -354,7 +354,7 @@ QList<ReplyParser::ContactInformation> ReplyParser::parseSyncTokenDelta(const QB
         }
         QString status = rmap.value("propstat").toMap().value("status").toMap().value("@text").toString();
         if (status.contains(QLatin1String("200 OK"))) {
-            if (!currInfo.uri.endsWith(QStringLiteral(".vcf"), Qt::CaseInsensitive) && currInfo.etag.isEmpty()) {
+            if (!currInfo.uri.endsWith(QStringLiteral(".vcf"), Qt::CaseInsensitive)) {
                 // this is probably a response for the addressbook resource,
                 // rather than for a contact resource within the addressbook.
                 LOG_DEBUG(Q_FUNC_INFO << "ignoring non-contact resource:" << currInfo.uri << currInfo.etag << status);
@@ -423,7 +423,7 @@ QList<ReplyParser::ContactInformation> ReplyParser::parseContactMetadata(const Q
         currInfo.uri = rmap.value("href").toMap().value("@text").toString();
         currInfo.etag = rmap.value("propstat").toMap().value("prop").toMap().value("getetag").toMap().value("@text").toString();
         QString status = rmap.value("propstat").toMap().value("status").toMap().value("@text").toString();
-        if (!currInfo.uri.endsWith(QStringLiteral(".vcf"), Qt::CaseInsensitive) && currInfo.etag.isEmpty()) {
+        if (!currInfo.uri.endsWith(QStringLiteral(".vcf"), Qt::CaseInsensitive)) {
             // this is probably a response for the addressbook resource,
             // rather than for a contact resource within the addressbook.
             LOG_DEBUG(Q_FUNC_INFO << "ignoring non-contact resource:" << currInfo.uri << currInfo.etag << status);
