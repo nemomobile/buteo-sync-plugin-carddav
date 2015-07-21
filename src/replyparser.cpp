@@ -258,7 +258,7 @@ QList<ReplyParser::AddressBookInformation> ReplyParser::parseAddressbookInformat
     Q_FOREACH (const QVariant &rv, responses) {
         QVariantMap rmap = rv.toMap();
         ReplyParser::AddressBookInformation currInfo;
-        currInfo.url = rmap.value("href").toMap().value("@text").toString();
+        currInfo.url = QUrl::fromPercentEncoding(rmap.value("href").toMap().value("@text").toString().toUtf8());
         currInfo.ctag = rmap.value("propstat").toMap().value("prop").toMap().value("getctag").toMap().value("@text").toString();
         currInfo.syncToken = rmap.value("propstat").toMap().value("prop").toMap().value("sync-token").toMap().value("@text").toString();
         currInfo.displayName = rmap.value("propstat").toMap().value("prop").toMap().value("displayname").toMap().value("@text").toString();
@@ -344,7 +344,7 @@ QList<ReplyParser::ContactInformation> ReplyParser::parseSyncTokenDelta(const QB
     Q_FOREACH (const QVariant &rv, responses) {
         QVariantMap rmap = rv.toMap();
         ReplyParser::ContactInformation currInfo;
-        currInfo.uri = rmap.value("href").toMap().value("@text").toString();
+        currInfo.uri = QUrl::fromPercentEncoding(rmap.value("href").toMap().value("@text").toString().toUtf8());
         currInfo.etag = rmap.value("propstat").toMap().value("prop").toMap().value("getetag").toMap().value("@text").toString();
         QMap<QString, QString>::const_iterator it = q->m_contactUris.constBegin();
         for ( ; it != q->m_contactUris.constEnd(); ++it) {
@@ -420,7 +420,7 @@ QList<ReplyParser::ContactInformation> ReplyParser::parseContactMetadata(const Q
     Q_FOREACH (const QVariant &rv, responses) {
         QVariantMap rmap = rv.toMap();
         ReplyParser::ContactInformation currInfo;
-        currInfo.uri = rmap.value("href").toMap().value("@text").toString();
+        currInfo.uri = QUrl::fromPercentEncoding(rmap.value("href").toMap().value("@text").toString().toUtf8());
         currInfo.etag = rmap.value("propstat").toMap().value("prop").toMap().value("getetag").toMap().value("@text").toString();
         QString status = rmap.value("propstat").toMap().value("status").toMap().value("@text").toString();
         if (!currInfo.uri.endsWith(QStringLiteral(".vcf"), Qt::CaseInsensitive)) {
@@ -533,7 +533,7 @@ QMap<QString, ReplyParser::FullContactInformation> ReplyParser::parseContactData
     QMap<QString, ReplyParser::FullContactInformation> uriToContactData;
     Q_FOREACH (const QVariant &rv, responses) {
         QVariantMap rmap = rv.toMap();
-        QString uri = rmap.value("href").toMap().value("@text").toString();
+        QString uri = QUrl::fromPercentEncoding(rmap.value("href").toMap().value("@text").toString().toUtf8());
         QString etag = rmap.value("propstat").toMap().value("prop").toMap().value("getetag").toMap().value("@text").toString();
         QString vcard = rmap.value("propstat").toMap().value("prop").toMap().value("address-data").toMap().value("@text").toString();
 

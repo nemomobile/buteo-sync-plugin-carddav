@@ -337,10 +337,17 @@ QNetworkReply *RequestGenerator::contactMultiget(const QString &serverUrl, const
     QString uriHrefs;
     Q_FOREACH (const QString &uri, contactUris) {
         // note: uriHref is of form: <d:href>/addressbooks/johndoe/contacts/acme-12345.vcf</d:href> etc.
+        QString href = uri.toHtmlEscaped();
+        int lastPathMarker = href.lastIndexOf('/');
+        if (lastPathMarker > 0) {
+            // percent-encode the filename
+            QString vcfName = QUrl::toPercentEncoding(href.mid(lastPathMarker + 1));
+            href = href.mid(0, lastPathMarker+1) + vcfName;
+        }
         if (uri.endsWith(QStringLiteral(".vcf")) && uri.startsWith(addressbookPath)) {
-            uriHrefs.append(QStringLiteral("<d:href>%1</d:href>").arg(uri.toHtmlEscaped()));
+            uriHrefs.append(QStringLiteral("<d:href>%1</d:href>").arg(href));
         } else {
-            uriHrefs.append(QStringLiteral("<d:href>%1/%2.vcf</d:href>").arg(addressbookPath).arg(uri.toHtmlEscaped()));
+            uriHrefs.append(QStringLiteral("<d:href>%1/%2.vcf</d:href>").arg(addressbookPath).arg(href));
         }
     }
 
