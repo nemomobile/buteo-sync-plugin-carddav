@@ -541,7 +541,13 @@ void CardDav::downsyncAddressbookContent(const QList<ReplyParser::AddressBookInf
             q->m_defaultAddressbook = infos[i].url;
         }
 
-        if (infos[i].syncToken.isEmpty()) {
+        if (infos[i].syncToken.isEmpty() && infos[i].ctag.isEmpty()) {
+            // we cannot use either sync-token or ctag for this addressbook.
+            // we need to manually calculate the complete delta.
+            LOG_DEBUG("No sync-token or ctag given for addressbook:" << infos[i].url << ", manual delta detection required");
+            q->m_addressbookCtags[infos[i].url] = infos[i].ctag; // ctag is empty :. we will use manual detection.
+            fetchContactMetadata(infos[i].url);
+        } else if (infos[i].syncToken.isEmpty()) {
             // we cannot use sync-token for this addressbook, but instead ctag.
             const QString &existingCtag(q->m_addressbookCtags[infos[i].url]); // from OOB
             if (existingCtag.isEmpty()) {
