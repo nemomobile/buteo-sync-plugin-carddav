@@ -85,6 +85,11 @@ void Auth::signIn(int accountId)
 
     // determine the remote URL from the account settings, and then sign in.
     m_account->selectService(srv);
+    if (!m_account->enabled()) {
+        LOG_WARNING("Service:" << srv.name() << "is not enabled for account:" << m_account->id());
+        emit signInError();
+        return;
+    }
     m_ignoreSslErrors = m_account->value("ignore_ssl_errors").toBool();
     m_serverUrl = m_account->value("server_address").toString();
     m_addressbookPath = m_account->value("addressbook_path").toString(); // optional, may be empty.
