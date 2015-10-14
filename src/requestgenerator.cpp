@@ -65,7 +65,11 @@ QNetworkReply *RequestGenerator::generateRequest(const QString &url,
         // this is because the initial URL may be a user-principals URL
         // but subsequent paths are not relative to that one, but instead
         // are relative to the root path /
-        reqUrl.setPath(path);
+        if (path.startsWith('/')) {
+            reqUrl.setPath(path);
+        } else {
+            reqUrl.setPath('/' + path);
+        }
     }
     if (!m_username.isEmpty() && !m_password.isEmpty()) {
         reqUrl.setUserName(m_username);

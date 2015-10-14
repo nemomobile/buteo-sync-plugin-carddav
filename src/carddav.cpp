@@ -43,6 +43,7 @@
 #include <QVersitContactImporter>
 
 #include <seasidepropertyhandler.h>
+#include <seasidecache.h>
 
 #include <qtcontacts-extensions.h>
 
@@ -231,8 +232,22 @@ void CardDavVCardConverter::documentProcessed(const QVersitDocument &, QContact 
     m_tempUnsupportedProperties.clear();
 }
 
-void CardDavVCardConverter::contactProcessed(const QContact &, QVersitDocument *)
+void CardDavVCardConverter::contactProcessed(const QContact &c, QVersitDocument *d)
 {
+    // FN is a required field.  Add it if it does not exist.
+    bool foundFN = false;
+    Q_FOREACH (const QVersitProperty &p, d->properties()) {
+        if (p.name() == QStringLiteral("FN")) {
+            foundFN = true;
+            break;
+        }
+    }
+    if (!foundFN) {
+        QVersitProperty fnProp;
+        fnProp.setName("FN");
+        fnProp.setValue(SeasideCache::generateDisplayLabel(c));
+        d->addProperty(fnProp);
+    }
 }
 
 void CardDavVCardConverter::detailProcessed(const QContact &, const QContactDetail &,
@@ -241,9 +256,14 @@ void CardDavVCardConverter::detailProcessed(const QContact &, const QContactDeta
 {
     static QStringList supportedProperties(supportedPropertyNames());
     for (int i = toBeAdded->size() - 1; i >= 0; --i) {
-        if (!supportedProperties.contains(toBeAdded->at(i).name().toUpper())) {
+        const QString propName = toBeAdded->at(i).name().toUpper();
+        if (!supportedProperties.contains(propName)) {
             // we don't support importing these properties, so we shouldn't
             // attempt to export them.
+            toBeAdded->removeAt(i);
+        } else if (propName == QStringLiteral("X-GENDER")
+                && toBeAdded->at(i).value().toUpper() == QStringLiteral("UNSPECIFIED")) {
+            // this is probably added "by default" since qtcontacts-sqlite always stores a gender.
             toBeAdded->removeAt(i);
         }
     }
@@ -541,7 +561,13 @@ void CardDav::downsyncAddressbookContent(const QList<ReplyParser::AddressBookInf
             q->m_defaultAddressbook = infos[i].url;
         }
 
-        if (infos[i].syncToken.isEmpty()) {
+        if (infos[i].syncToken.isEmpty() && infos[i].ctag.isEmpty()) {
+            // we cannot use either sync-token or ctag for this addressbook.
+            // we need to manually calculate the complete delta.
+            LOG_DEBUG("No sync-token or ctag given for addressbook:" << infos[i].url << ", manual delta detection required");
+            q->m_addressbookCtags[infos[i].url] = infos[i].ctag; // ctag is empty :. we will use manual detection.
+            fetchContactMetadata(infos[i].url);
+        } else if (infos[i].syncToken.isEmpty()) {
             // we cannot use sync-token for this addressbook, but instead ctag.
             const QString &existingCtag(q->m_addressbookCtags[infos[i].url]); // from OOB
             if (existingCtag.isEmpty()) {
@@ -945,8 +971,16 @@ void CardDav::upsyncResponse()
         LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
                    << "(" << httpError << ")");
         debugDumpData(QString::fromUtf8(data));
-        errorOccurred(httpError);
-        return;
+        if (httpError == 405) {
+            // MethodNotAllowed error.  Most likely the server has restricted
+            // new writes to the collection (e.g., read-only or update-only).
+            // We should not abort the sync if we receive this error.
+            LOG_WARNING(Q_FUNC_INFO << "405 MethodNotAllowed - is the collection read-only?");
+            LOG_WARNING(Q_FUNC_INFO << "continuing sync despite this error - upsync will have failed!");
+        } else {
+            errorOccurred(httpError);
+            return;
+        }
     }
 
     if (!guid.isEmpty()) {

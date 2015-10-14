@@ -255,38 +255,121 @@ QList<ReplyParser::AddressBookInformation> ReplyParser::parseAddressbookInformat
         responses << response;
     }
 
+    // parse the information about each addressbook (response element)
     Q_FOREACH (const QVariant &rv, responses) {
         QVariantMap rmap = rv.toMap();
         ReplyParser::AddressBookInformation currInfo;
         currInfo.url = QUrl::fromPercentEncoding(rmap.value("href").toMap().value("@text").toString().toUtf8());
-        currInfo.ctag = rmap.value("propstat").toMap().value("prop").toMap().value("getctag").toMap().value("@text").toString();
-        currInfo.syncToken = rmap.value("propstat").toMap().value("prop").toMap().value("sync-token").toMap().value("@text").toString();
-        currInfo.displayName = rmap.value("propstat").toMap().value("prop").toMap().value("displayname").toMap().value("@text").toString();
-        QStringList resourceTypeKeys = rmap.value("propstat").toMap().value("prop").toMap().value("resourcetype").toMap().keys();
-        if (resourceTypeKeys.isEmpty()
-                || (resourceTypeKeys.size() == 1 && resourceTypeKeys.contains(QStringLiteral("collection"), Qt::CaseInsensitive))
-                || (resourceTypeKeys.contains(QStringLiteral("addressbook"), Qt::CaseInsensitive))) {
-            // This is probably a carddav addressbook collection.
-            // Despite section 5.2 of RFC6352 stating that a CardDAV
-            // server MUST return the 'addressbook' value in the resource types
-            // property, some CardDAV implementations (eg, Memotoo) do not.
-            LOG_DEBUG(Q_FUNC_INFO << "parsing information for addressbook:" << currInfo.url);
+
+        // some services (e.g. Cozy) return multiple propstat elements in each response
+        QVariantList propstats;
+        if (rmap.value("propstat").type() == QVariant::List) {
+            propstats = rmap.value("propstat").toList();
         } else {
-            // the resource is explicitly described as non-addressbook resource.
-            LOG_DEBUG(Q_FUNC_INFO << "ignoring non-addressbook response");
+            QVariantMap propstat = rmap.value("propstat").toMap();
+            propstats << propstat;
+        }
+
+        // examine the propstat elements to find the features we're interested in
+        enum ResourceStatus { StatusUnknown = 0,
+                              StatusExplicitly2xxOk = 1,
+                              StatusExplicitlyTrue = 1,
+                              StatusExplicitlyNotOk = 2,
+                              StatusExplicitlyFalse = 2 };
+        ResourceStatus addressbookResourceSpecified = StatusUnknown; // valid values are Unknown/True/False
+        ResourceStatus resourcetypeStatus = StatusUnknown;  // valid values are Unknown/2xxOk/NotOk
+        ResourceStatus otherPropertyStatus = StatusUnknown; // valid values are Unknown/2xxOk/NotOk
+        Q_FOREACH (const QVariant &vpropstat, propstats) {
+            QVariantMap propstat = vpropstat.toMap();
+            const QVariantMap &prop(propstat.value("prop").toMap());
+            if (prop.contains("getctag")) {
+                currInfo.ctag = prop.value("getctag").toMap().value("@text").toString();
+            }
+            if (prop.contains("sync-token")) {
+                currInfo.syncToken = prop.value("sync-token").toMap().value("@text").toString();
+            }
+            if (prop.contains("displayname")) {
+                currInfo.displayName = prop.value("displayname").toMap().value("@text").toString();
+            }
+            bool thisPropstatIsForResourceType = false;
+            if (prop.contains("resourcetype")) {
+                thisPropstatIsForResourceType = true;
+                QStringList resourceTypeKeys = prop.value("resourcetype").toMap().keys();
+                if ((resourceTypeKeys.size() == 1 && resourceTypeKeys.contains(QStringLiteral("collection"), Qt::CaseInsensitive))
+                        || (resourceTypeKeys.contains(QStringLiteral("addressbook"), Qt::CaseInsensitive))) {
+                    // This is probably a carddav addressbook collection.
+                    // Despite section 5.2 of RFC6352 stating that a CardDAV
+                    // server MUST return the 'addressbook' value in the resource types
+                    // property, some CardDAV implementations (eg, Memotoo) do not.
+                    addressbookResourceSpecified = StatusExplicitlyTrue;
+                    LOG_DEBUG(Q_FUNC_INFO << "have addressbook resource:" << currInfo.url);
+                } else {
+                    // the resource is explicitly described as non-addressbook resource.
+                    addressbookResourceSpecified = StatusExplicitlyFalse;
+                    LOG_DEBUG(Q_FUNC_INFO << "have non-addressbook resource:" << currInfo.url);
+                }
+            }
+            // Some services (e.g. Cozy) return multiple propstats
+            // where only one will refer to the resourcetype property itself;
+            // others will refer to incidental properties like displayname etc.
+            // Each propstat will (should) contain a status code, which applies
+            // only to the properties referred to within the propstat.
+            // Thus, a 404 code may only apply to a displayname, etc.
+            if (propstat.contains("status")) {
+                static const QRegularExpression Http2xxOk("2[0-9][0-9]");
+                QString status = propstat.value("status").toMap().value("@text").toString();
+                bool statusOk = status.contains(Http2xxOk); // any HTTP 2xx OK response
+                if (thisPropstatIsForResourceType) {
+                    // This status applies to the resourcetype property.
+                    if (statusOk) {
+                        resourcetypeStatus = StatusExplicitly2xxOk; // explicitly ok
+                    } else {
+                        resourcetypeStatus = StatusExplicitlyNotOk; // explicitly not ok
+                        LOG_DEBUG(Q_FUNC_INFO << "response has non-OK status:" << status
+                                              << "for properties:" << prop.keys()
+                                              << "for url:" << currInfo.url);
+                    }
+                } else {
+                    // This status applies to some other property.
+                    // In some cases (e.g. Memotoo) we may need
+                    // to infer that this status refers to the
+                    // entire response.
+                    if (statusOk) {
+                        otherPropertyStatus = StatusExplicitly2xxOk; // explicitly ok
+                    } else {
+                        otherPropertyStatus = StatusExplicitlyNotOk; // explicitly not ok
+                        LOG_DEBUG(Q_FUNC_INFO << "response has non-OK status:" << status
+                                              << "for non-resourcetype properties:" << prop.keys()
+                                              << "for url:" << currInfo.url);
+                    }
+                }
+            }
+        }
+
+        // now check to see if we have all of the required information
+        if (resourcetypeStatus == StatusExplicitly2xxOk) {
+            // we definitely had a well-specified resourcetype response, with 200 OK status.
+            LOG_DEBUG(Q_FUNC_INFO << "have addressbook resource with status OK:" << currInfo.url);
+        } else if (propstats.count() == 1                          // only one response element
+                && addressbookResourceSpecified == StatusUnknown   // resource type unknown
+                && otherPropertyStatus == StatusExplicitly2xxOk) { // status was explicitly ok
+            // we assume that this was an implicit Addressbook Collection resourcetype response.
+            LOG_DEBUG(Q_FUNC_INFO << "have probable addressbook resource with status OK:" << currInfo.url);
+        } else {
+            // we either cannot infer that this was an Addressbook Collection
+            // or we were told explicitly that the collection status was NOT OK.
+            LOG_DEBUG(Q_FUNC_INFO << "ignoring resource:" << currInfo.url << "due to type or status:"
+                                  << addressbookResourceSpecified << resourcetypeStatus << otherPropertyStatus);
             continue;
         }
-        QString status = rmap.value("propstat").toMap().value("status").toMap().value("@text").toString();
-        if (status.contains(QRegularExpression("2[0-9][0-9]"))) { // any HTTP 2xx response
-            if (currInfo.ctag.isEmpty() && currInfo.syncToken.isEmpty()) {
-                LOG_DEBUG(Q_FUNC_INFO << "ignoring addressbook:" << currInfo.url << "due to lack of ctag");
-            } else {
-                LOG_DEBUG(Q_FUNC_INFO << "found valid addressbook:" << currInfo.url);
-                infos.append(currInfo);
-            }
+
+        // add the addressbook to our return list.  If we have no sync-token or c-tag, we do manual delta detection.
+        if (currInfo.ctag.isEmpty() && currInfo.syncToken.isEmpty()) {
+            LOG_DEBUG(Q_FUNC_INFO << "addressbook:" << currInfo.url << "has no sync-token or c-tag");
         } else {
-            LOG_DEBUG(Q_FUNC_INFO << "ignoring addressbook:" << currInfo.url << "due to invalid status:" << status);
+            LOG_DEBUG(Q_FUNC_INFO << "found valid addressbook:" << currInfo.url << "with sync-token or c-tag");
         }
+        infos.append(currInfo);
     }
 
     return infos;
