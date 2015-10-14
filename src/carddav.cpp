@@ -971,8 +971,16 @@ void CardDav::upsyncResponse()
         LOG_WARNING(Q_FUNC_INFO << "error:" << reply->error()
                    << "(" << httpError << ")");
         debugDumpData(QString::fromUtf8(data));
-        errorOccurred(httpError);
-        return;
+        if (httpError == 405) {
+            // MethodNotAllowed error.  Most likely the server has restricted
+            // new writes to the collection (e.g., read-only or update-only).
+            // We should not abort the sync if we receive this error.
+            LOG_WARNING(Q_FUNC_INFO << "405 MethodNotAllowed - is the collection read-only?");
+            LOG_WARNING(Q_FUNC_INFO << "continuing sync despite this error - upsync will have failed!");
+        } else {
+            errorOccurred(httpError);
+            return;
+        }
     }
 
     if (!guid.isEmpty()) {
