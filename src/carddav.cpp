@@ -43,6 +43,7 @@
 #include <QVersitContactImporter>
 
 #include <seasidepropertyhandler.h>
+#include <seasidecache.h>
 
 #include <qtcontacts-extensions.h>
 
@@ -231,8 +232,22 @@ void CardDavVCardConverter::documentProcessed(const QVersitDocument &, QContact 
     m_tempUnsupportedProperties.clear();
 }
 
-void CardDavVCardConverter::contactProcessed(const QContact &, QVersitDocument *)
+void CardDavVCardConverter::contactProcessed(const QContact &c, QVersitDocument *d)
 {
+    // FN is a required field.  Add it if it does not exist.
+    bool foundFN = false;
+    Q_FOREACH (const QVersitProperty &p, d->properties()) {
+        if (p.name() == QStringLiteral("FN")) {
+            foundFN = true;
+            break;
+        }
+    }
+    if (!foundFN) {
+        QVersitProperty fnProp;
+        fnProp.setName("FN");
+        fnProp.setValue(SeasideCache::generateDisplayLabel(c));
+        d->addProperty(fnProp);
+    }
 }
 
 void CardDavVCardConverter::detailProcessed(const QContact &, const QContactDetail &,
@@ -241,9 +256,14 @@ void CardDavVCardConverter::detailProcessed(const QContact &, const QContactDeta
 {
     static QStringList supportedProperties(supportedPropertyNames());
     for (int i = toBeAdded->size() - 1; i >= 0; --i) {
-        if (!supportedProperties.contains(toBeAdded->at(i).name().toUpper())) {
+        const QString propName = toBeAdded->at(i).name().toUpper();
+        if (!supportedProperties.contains(propName)) {
             // we don't support importing these properties, so we shouldn't
             // attempt to export them.
+            toBeAdded->removeAt(i);
+        } else if (propName == QStringLiteral("X-GENDER")
+                && toBeAdded->at(i).value().toUpper() == QStringLiteral("UNSPECIFIED")) {
+            // this is probably added "by default" since qtcontacts-sqlite always stores a gender.
             toBeAdded->removeAt(i);
         }
     }
